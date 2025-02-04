@@ -1,0 +1,8 @@
+* {
+    margin: 0;
+    font-family: 'Roboto', sans-serif;
+}
+
+main {
+    transition: margin-left .3s ease;
+}
