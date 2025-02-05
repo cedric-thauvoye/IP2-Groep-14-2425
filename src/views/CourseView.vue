@@ -21,33 +21,22 @@ import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { doc, getDoc } from 'firebase/firestore'
 import { db } from '../main'
-import { getAuth } from 'firebase/auth'
+import { fetchUserDetailsBatch } from '../api/userApi'
 
 const route = useRoute()
 const course = ref(null)
 const students = ref([])
 const teachers = ref([])
 
-const fetchUserDetails = async (uid) => {
-    const auth = getAuth()
-    try {
-        const user = await getUser(auth, uid)
-        return { uid, displayName: user.displayName, email: user.email }
-    } catch (error) {
-        console.error("Error fetching user details:", error)
-        return null
-    }
-}
-
 onMounted(async () => {
     const courseId = route.params.courseId
     const courseDoc = await getDoc(doc(db, 'Courses', courseId))
     if (courseDoc.exists()) {
         course.value = { id: courseId, ...courseDoc.data() }
-        const studentPromises = course.value.students.map(uid => fetchUserDetails(uid))
-        const teacherPromises = course.value.teachers.map(uid => fetchUserDetails(uid))
-        students.value = await Promise.all(studentPromises)
-        teachers.value = await Promise.all(teacherPromises)
+        const studentUids = course.value.students
+        const teacherUids = course.value.teachers
+        students.value = await fetchUserDetailsBatch(studentUids)
+        teachers.value = await fetchUserDetailsBatch(teacherUids)
     } else {
         console.error("No such course document!")
     }

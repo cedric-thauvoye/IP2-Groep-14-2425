@@ -42,6 +42,25 @@ app.get('/users/:uid', verifyToken, async (req, res) => {
     }
 });
 
+// Get multiple Authentication users by UIDs
+app.post('/users/batch', verifyToken, async (req, res) => {
+    try {
+        const { uids } = req.body;
+        const users = await Promise.all(uids.map((uid) => auth.getUser(uid)));
+        const userDetails = users.map((user) => ({
+            uid: user.uid,
+            email: user.email,
+            displayName: user.displayName,
+            provider: user.providerData.map((p) => p.providerId),
+            createdAt: user.metadata.creationTime
+        }));
+
+        res.json(userDetails);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
