@@ -1,30 +1,35 @@
-import { createRouter, createWebHistory } from 'vue-router'
-import CourseView from '../views/CourseView.vue'
+import { createRouter, createWebHistory } from 'vue-router';
+import HomeView from '../views/HomeView.vue';
+import CourseView from '../views/CourseView.vue';
+import GroupView from '../views/GroupView.vue';
+import LoginView from '../views/LoginView.vue'; // Import LoginView
+
+const routes = [
+    {
+        path: '/login',
+        name: 'login',
+        component: LoginView
+    },
+    {
+        path: '/home',
+        name: 'home',
+        component: HomeView
+    },
+    {
+        path: '/course/:courseId',
+        name: 'course',
+        component: CourseView
+    },
+    {
+        path: '/course/:courseId/groups/:groupId',
+        name: 'group',
+        component: GroupView
+    }
+];
 
 const router = createRouter({
     history: createWebHistory(import.meta.env.BASE_URL),
-    routes: [
-        {
-            path: '/',
-            name: 'login',
-            component: () => import('../views/LoginView.vue'),
-        },
-        {
-            path: '/home',
-            name: 'home',
-            component: () => import('../views/HomeView.vue'),
-        },
-        {
-            path: '/about',
-            name: 'about',
-            component: () => import('../views/AboutView.vue'),
-        },
-        {
-            path: '/course/:courseId',
-            name: 'CourseView',
-            component: CourseView,
-        },
-    ],
-})
+    routes
+});
 
-export default router
+export default router;

@@ -4,15 +4,6 @@
         <div v-if="user">
             <p>Welcome, {{ user.displayName }}!</p>
             <p><button @click="signOutUser">Sign Out</button></p>
-            <div v-if="groups.length">
-                <h2>Your Groups</h2>
-                <ul>
-                    <li v-for="group in groups" :key="group.id">{{ group.name }}</li>
-                </ul>
-            </div>
-            <div v-else>
-                <p>You are not a member of any groups.</p>
-            </div>
             <div v-if="courses.length">
                 <h2>Your Courses</h2>
                 <ul>
@@ -41,7 +32,6 @@ import { db } from '../main';
 
 const auth = getAuth();
 const user = ref(null);
-const groups = ref([]);
 const courses = ref([]);
 const router = useRouter();
 
@@ -58,11 +48,6 @@ onMounted(() => {
     onAuthStateChanged(auth, (loggedInUser) => {
         user.value = loggedInUser;
         if (loggedInUser) {
-            const qGroups = query(collection(db, 'Groups'), where('students', 'array-contains', loggedInUser.uid));
-            onSnapshot(qGroups, (querySnapshotGroups) => {
-                groups.value = querySnapshotGroups.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            });
-
             const qCourses = query(collection(db, 'Courses'), where('students', 'array-contains', loggedInUser.uid));
             onSnapshot(qCourses, (querySnapshotCourses) => {
                 courses.value = querySnapshotCourses.docs.map(doc => ({ id: doc.id, ...doc.data() }));
