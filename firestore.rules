@@ -1,0 +1,62 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Function to check if email belongs to a student or teacher
+    function isAuthorizedDomain() {
+      return request.auth.token.email.matches('.*@(student\\.odisee\\.be|odisee\\.be)') &&
+             request.auth.token.firebase.sign_in_provider == "microsoft.com";
+    }
+
+    // Function to check if email belongs to a student
+    function isStudent() {
+      return request.auth.token.email.matches('.*@student\\.odisee\\.be') &&
+             request.auth.token.firebase.sign_in_provider == "microsoft.com";
+    }
+
+    // Function to check if email belongs to a teacher
+    function isTeacher() {
+      return request.auth.token.email.matches('.*@odisee\\.be') &&
+             request.auth.token.firebase.sign_in_provider == "microsoft.com";
+    }
+
+    // USERS COLLECTION (Only allow one-time creation, no updates or deletes)
+    match /Users/{userId} {
+    	// Everyone can read user profiles
+    	allow read: if request.auth != null && isAuthorizedDomain();
+    
+      // Only allow users to create their own document, enforcing role based on email
+      allow create: if request.auth != null && isAuthorizedDomain() && 
+                    request.auth.uid == userId &&
+                    request.resource.data.role == (isStudent() ? "student" : "teacher") &&
+                    request.resource.data.email == request.auth.token.email &&
+                    request.resource.data.displayName == request.auth.token.name;
+
+      // No one can edit or delete a user, not even themselves
+      allow update, delete: if false;
+    }
+
+    // COURSES COLLECTION (Only teachers can create/edit/delete, students can only read if enrolled)
+    match /Courses/{courseId} {
+      // Teachers can create, update, delete courses
+      allow create, update, delete: if request.auth != null && isTeacher();
+      
+      // Students can only read if they are enrolled in the course
+      allow read: if request.auth != null && isAuthorizedDomain() && 
+      							(request.auth.uid in resource.data.teachers || request.auth.uid in resource.data.students);
+    }
+
+    // GROUPS COLLECTION (Only teachers can create/edit/delete, students can only read)
+    match /Groups/{groupId} {
+      // Ensure the group is linked to an existing course
+      allow create: if request.auth != null && isTeacher() && 
+                    exists(/databases/$(database)/documents/Courses/$(request.resource.data.course_id));
+
+      // Only teachers can edit/delete groups
+      allow update, delete: if request.auth != null && isTeacher();
+
+      // Students can only read groups
+      allow read: if request.auth != null && isAuthorizedDomain();
+    }
+  }
+}
