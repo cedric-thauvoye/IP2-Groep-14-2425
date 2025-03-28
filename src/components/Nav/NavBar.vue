@@ -7,14 +7,60 @@
             <button v-if="isSmallScreen" @click="toggleNavBar" class="close-button">
                 <i class="fas fa-times"></i>
             </button>
+
+            <!-- Profile Section -->
             <div class="profile">
                 <img :src="user.photoURL || 'https://placehold.co/50'" alt="User Avatar" class="avatar">
-                <p class="displayName">{{ user.displayName }}</p>
+                <div class="profile-info">
+                    <p class="displayName">{{ user.displayName }}</p>
+                    <p class="role">{{ userRole }}</p>
+                </div>
             </div>
+
+            <!-- Navigation Options -->
             <div class="navOptions">
-                <NavOption to="/home">Home</NavOption>
-                <NavOption to="/profile">Profile</NavOption>
-                <NavOption to="/" color="#ff2828" @click="signOutUser">Logout</NavOption>
+                <div class="nav-section">
+                    <h3>Main</h3>
+                    <NavOption to="/home">
+                        <i class="fas fa-home"></i> Dashboard
+                    </NavOption>
+                </div>
+
+                <div class="nav-section">
+                    <h3>Academic</h3>
+                    <NavOption to="/courses">
+                        <i class="fas fa-book"></i> Courses
+                    </NavOption>
+                    <NavOption to="/groups">
+                        <i class="fas fa-users"></i> Groups
+                    </NavOption>
+                </div>
+
+                <div class="nav-section" v-if="isTeacher">
+                    <h3>Management</h3>
+                    <NavOption to="/students">
+                        <i class="fas fa-user-graduate"></i> Students
+                    </NavOption>
+                    <NavOption to="/import">
+                        <i class="fas fa-file-import"></i> Import Data
+                    </NavOption>
+                </div>
+
+                <div class="nav-section">
+                    <h3>Assessments</h3>
+                    <NavOption to="/assessments">
+                        <i class="fas fa-tasks"></i> My Assessments
+                    </NavOption>
+                    <NavOption to="/results" v-if="isTeacher">
+                        <i class="fas fa-chart-bar"></i> Results
+                    </NavOption>
+                </div>
+
+                <div class="nav-section bottom-section">
+                    <NavOption to="/" @click="signOutUser" class="logout-option">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </NavOption>
+                </div>
             </div>
         </nav>
     </div>
@@ -63,9 +109,15 @@ const signOutUser = () => {
     });
 };
 
+const userRole = ref('Student');
+const isTeacher = ref(false);
+
 onMounted(() => {
     onAuthStateChanged(auth, (loggedInUser) => {
         user.value = loggedInUser;
+        // TODO: Get user role from Firestore
+        isTeacher.value = true; // Set this based on user's role
+        userRole.value = isTeacher.value ? 'Teacher' : 'Student';
     });
     updateScreenSize();
 });
@@ -81,8 +133,8 @@ onMounted(() => {
     flex-direction: column;
     align-items: center;
     padding: 10px;
-    background-color: #FAFAFA;
-    color: white;
+    background: linear-gradient(180deg, #2C3E50 0%, #3498DB 100%);
+    color: #fff;
     position: fixed;
     top: 0;
     left: 0;
@@ -119,11 +171,27 @@ onMounted(() => {
     width: 100%;
     align-items: center;
     gap: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 20px;
+    border-radius: 10px;
+    margin: 20px 0;
+}
+
+.profile-info {
+    display: flex;
+    flex-direction: column;
 }
 
 .profile .displayName {
-    color: black;
+    color: white;
     font-weight: bold;
+    margin: 0;
+}
+
+.profile .role {
+    color: #BDC3C7;
+    font-size: 0.8em;
+    margin: 5px 0 0 0;
 }
 
 .profile .avatar {
@@ -137,5 +205,33 @@ onMounted(() => {
     margin-top: 20px;
     flex-direction: column;
     width: 100%;
+}
+
+.nav-section {
+    width: 100%;
+    margin: 10px 0;
+    padding: 0 15px;
+}
+
+.nav-section h3 {
+    color: #ECF0F1;
+    font-size: 0.8em;
+    text-transform: uppercase;
+    margin: 20px 0 10px 0;
+    padding-left: 10px;
+}
+
+.bottom-section {
+    margin-top: auto;
+    padding-bottom: 20px;
+}
+
+.logout-option {
+    color: #E74C3C !important;
+}
+
+i {
+    margin-right: 10px;
+    width: 20px;
 }
 </style>
