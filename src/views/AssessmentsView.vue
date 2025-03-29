@@ -27,7 +27,12 @@
                 </button>
             </div>
 
-            <div class="assessments-grid" v-if="activeTab === 'pending'">
+            <div v-if="loading" class="loading-state">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Loading assessments...</p>
+            </div>
+
+            <div v-else-if="activeTab === 'pending' && pendingAssessments.length > 0" class="assessments-grid">
                 <div v-for="assessment in pendingAssessments"
                      :key="assessment.id"
                      class="assessment-card"
@@ -52,7 +57,7 @@
                 </div>
             </div>
 
-            <div class="assessments-grid" v-else>
+            <div v-else-if="activeTab === 'completed' && completedAssessments.length > 0" class="assessments-grid">
                 <div v-for="assessment in completedAssessments"
                      :key="assessment.id"
                      class="assessment-card completed"
@@ -67,7 +72,7 @@
                         <div class="stats">
                             <div class="stat">
                                 <span class="label">Score</span>
-                                <span class="value">{{ assessment.score }}/10</span>
+                                <span class="value">{{ assessment.score }}</span>
                             </div>
                             <div class="stat">
                                 <span class="label">Time Spent</span>
@@ -82,6 +87,12 @@
                     </div>
                 </div>
             </div>
+
+            <div v-else class="empty-state">
+                <i class="fas fa-tasks"></i>
+                <h3>No {{ activeTab === 'pending' ? 'Pending' : 'Completed' }} Assessments Found</h3>
+                <p>{{ activeTab === 'pending' ? 'You currently have no pending assessments to complete.' : 'You have not completed any assessments yet.' }}</p>
+            </div>
         </div>
     </PageLayout>
 </template>
@@ -90,12 +101,14 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
+import { assessmentService, authService } from '../services/api';
 
 const router = useRouter();
 const activeTab = ref('pending');
-const isTeacher = ref(true); // TODO: Implement proper role check
+const isTeacher = ref(false);
 const pendingAssessments = ref([]);
 const completedAssessments = ref([]);
+const loading = ref(true);
 
 const formatDate = (date) => {
     return new Date(date).toLocaleDateString('en-US', {
@@ -113,30 +126,27 @@ const viewResults = (id) => {
     router.push(`/assessment/${id}/results`);
 };
 
-onMounted(() => {
-    // Mock data - Replace
-    pendingAssessments.value = [
-        {
-            id: 1,
-            title: 'Web Development Peer Review',
-            courseName: 'Web Development',
-            description: 'Evaluate your team members\' contributions to the project',
-            dueDate: '2024-01-20',
-            progress: 60
-        },
-    ];
+onMounted(async () => {
+    try {
+        loading.value = true;
 
-    completedAssessments.value = [
-        {
-            id: 2,
-            title: 'Project Management Assessment',
-            courseName: 'Project Management',
-            description: 'Team collaboration assessment',
-            completedDate: '2024-01-15',
-            score: 8.5,
-            timeSpent: '45 min'
-        },
-    ];
+        // Check if user is a teacher
+        const { data: roleData } = await authService.checkUserRole();
+        isTeacher.value = roleData.role === 'teacher' || roleData.role === 'admin';
+
+        // Fetch pending assessments
+        const pendingResponse = await assessmentService.getPendingAssessments();
+        pendingAssessments.value = pendingResponse.data;
+
+        // Fetch completed assessments
+        const completedResponse = await assessmentService.getCompletedAssessments();
+        completedAssessments.value = completedResponse.data;
+    } catch (error) {
+        console.error('Error fetching assessments:', error);
+        // Handle error states appropriately
+    } finally {
+        loading.value = false;
+    }
 });
 </script>
 
@@ -193,6 +203,20 @@ onMounted(() => {
     padding: 0.2rem 0.6rem;
     border-radius: 12px;
     font-size: 0.8rem;
+}
+
+.loading-state, .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    color: #7f8c8d;
+}
+
+.loading-state i, .empty-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
 }
 
 .assessments-grid {

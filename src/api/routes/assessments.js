@@ -1,0 +1,650 @@
+const express = require('express');
+
+module.exports = (pool) => {
+  const router = express.Router();
+
+  // Middleware to verify JWT token
+  const authenticateToken = async (req, res, next) => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (!token) return res.status(401).json({ message: 'Unauthorized: No token provided' });
+
+    try {
+      // Since we don't have direct access to jwt module here, we'll extract user info from headers
+      // In a real app, you might want to pass the jwt module to this function too
+      const user = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+      req.user = user;
+      next();
+    } catch (error) {
+      return res.status(403).json({ message: 'Forbidden: Invalid token' });
+    }
+  };
+
+  // Get pending assessments
+  router.get('/pending', authenticateToken, async (req, res) => {
+    try {
+      const conn = await pool.getConnection();
+
+      // Different queries for students and teachers
+      let query, params;
+
+      if (req.user.role === 'student') {
+        // Students see assessments assigned to their groups that they haven't responded to yet
+        query = `
+          SELECT a.id, a.title, a.description, a.due_date, c.name as courseName,
+                 g.name as groupName, IFNULL(r.id, 0) as responded,
+                 (CASE
+                   WHEN r.id IS NULL THEN 0
+                   ELSE 100
+                 END) as progress
+          FROM assessments a
+          JOIN courses c ON a.course_id = c.id
+          JOIN groups g ON a.group_id = g.id
+          JOIN group_students gs ON g.id = gs.group_id
+          LEFT JOIN responses r ON a.id = r.assessment_id AND r.student_id = ?
+          WHERE gs.student_id = ?
+          AND (r.id IS NULL OR r.submitted_at IS NULL)
+          AND a.due_date > NOW()
+          ORDER BY a.due_date ASC`;
+        params = [req.user.id, req.user.id];
+      } else {
+        // Teachers see assessments they created that are still pending
+        query = `
+          SELECT a.id, a.title, a.description, a.due_date, c.name as courseName,
+                 g.name as groupName,
+                 (SELECT COUNT(r.id) FROM responses r WHERE r.assessment_id = a.id) as responses_count,
+                 (SELECT COUNT(gs.id) FROM group_students gs WHERE gs.group_id = a.group_id) as students_count
+          FROM assessments a
+          JOIN courses c ON a.course_id = c.id
+          JOIN groups g ON a.group_id = g.id
+          WHERE a.teacher_id = ?
+          AND a.due_date > NOW()
+          ORDER BY a.due_date ASC`;
+        params = [req.user.id];
+      }
+
+      const [rows] = await conn.execute(query, params);
+      conn.release();
+
+      // Transform data based on role
+      const pendingAssessments = rows.map(row => {
+        if (req.user.role === 'student') {
+          return {
+            id: row.id,
+            title: row.title,
+            courseName: row.courseName,
+            groupName: row.groupName,
+            description: row.description,
+            dueDate: row.due_date,
+            progress: row.progress || 0
+          };
+        } else {
+          // Calculate progress for teachers
+          const completionPercentage = row.students_count > 0
+            ? Math.round((row.responses_count / row.students_count) * 100)
+            : 0;
+
+          return {
+            id: row.id,
+            title: row.title,
+            courseName: row.courseName,
+            groupName: row.groupName,
+            description: row.description,
+            dueDate: row.due_date,
+            responsesCount: row.responses_count,
+            studentsCount: row.students_count,
+            progress: completionPercentage
+          };
+        }
+      });
+
+      res.json(pendingAssessments);
+    } catch (error) {
+      console.error('Error fetching pending assessments:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
+
+  // Get completed assessments
+  router.get('/completed', authenticateToken, async (req, res) => {
+    try {
+      const conn = await pool.getConnection();
+
+      // Different queries for students and teachers
+      let query, params;
+
+      if (req.user.role === 'student') {
+        // Students see assessments they've completed
+        query = `
+          SELECT a.id, a.title, a.description, c.name as courseName,
+                 g.name as groupName, r.submitted_at as completedDate,
+                 (SELECT AVG(given_score) FROM results res WHERE res.response_id = r.id) as score
+          FROM assessments a
+          JOIN courses c ON a.course_id = c.id
+          JOIN groups g ON a.group_id = g.id
+          JOIN responses r ON a.id = r.assessment_id
+          WHERE r.student_id = ?
+          AND r.submitted_at IS NOT NULL
+          ORDER BY r.submitted_at DESC`;
+        params = [req.user.id];
+      } else {
+        // Teachers see assessments they created that have passed due date
+        query = `
+          SELECT a.id, a.title, a.description, c.name as courseName,
+                 g.name as groupName, a.due_date,
+                 (SELECT COUNT(r.id) FROM responses r WHERE r.assessment_id = a.id) as responses_count,
+                 (SELECT COUNT(gs.id) FROM group_students gs WHERE gs.group_id = a.group_id) as students_count
+          FROM assessments a
+          JOIN courses c ON a.course_id = c.id
+          JOIN groups g ON a.group_id = g.id
+          WHERE a.teacher_id = ?
+          AND (a.due_date < NOW() OR
+               (SELECT COUNT(r.id) FROM responses r WHERE r.assessment_id = a.id) =
+               (SELECT COUNT(gs.id) FROM group_students gs WHERE gs.group_id = a.group_id))
+          ORDER BY a.due_date DESC`;
+        params = [req.user.id];
+      }
+
+      const [rows] = await conn.execute(query, params);
+      conn.release();
+
+      // Transform data based on role
+      const completedAssessments = rows.map(row => {
+        if (req.user.role === 'student') {
+          return {
+            id: row.id,
+            title: row.title,
+            courseName: row.courseName,
+            groupName: row.groupName,
+            description: row.description,
+            completedDate: row.completedDate,
+            score: row.score ? parseFloat(row.score).toFixed(1) : 'N/A',
+            timeSpent: '30 min' // This could be calculated if you track time spent
+          };
+        } else {
+          // Calculate completion percentage for teachers
+          const completionPercentage = row.students_count > 0
+            ? Math.round((row.responses_count / row.students_count) * 100)
+            : 0;
+
+          return {
+            id: row.id,
+            title: row.title,
+            courseName: row.courseName,
+            groupName: row.groupName,
+            description: row.description,
+            dueDate: row.due_date,
+            responsesCount: row.responses_count,
+            studentsCount: row.students_count,
+            completionRate: `${completionPercentage}%`
+          };
+        }
+      });
+
+      res.json(completedAssessments);
+    } catch (error) {
+      console.error('Error fetching completed assessments:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
+
+  // Get assessment by ID
+  router.get('/:id', authenticateToken, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const conn = await pool.getConnection();
+
+      // Basic assessment info
+      const [assessmentRows] = await conn.execute(
+        `SELECT a.*, c.name as courseName, g.name as groupName
+         FROM assessments a
+         JOIN courses c ON a.course_id = c.id
+         JOIN groups g ON a.group_id = g.id
+         WHERE a.id = ?`,
+        [id]
+      );
+
+      if (assessmentRows.length === 0) {
+        conn.release();
+        return res.status(404).json({ message: 'Assessment not found' });
+      }
+
+      const assessment = assessmentRows[0];
+
+      // Check permissions
+      if (req.user.role === 'student') {
+        // Check if student is in the group
+        const [memberCheck] = await conn.execute(
+          `SELECT 1 FROM group_students
+           WHERE group_id = ? AND student_id = ?`,
+          [assessment.group_id, req.user.id]
+        );
+
+        if (memberCheck.length === 0) {
+          conn.release();
+          return res.status(403).json({ message: 'Not authorized to view this assessment' });
+        }
+      } else if (req.user.role === 'teacher' && assessment.teacher_id !== req.user.id) {
+        // Check if teacher created this assessment
+        conn.release();
+        return res.status(403).json({ message: 'Not authorized to view this assessment' });
+      }
+
+      // Get assessment criteria
+      const [criteria] = await conn.execute(
+        `SELECT id, name, description, min_score, max_score
+         FROM assessment_criteria
+         WHERE assessment_id = ?`,
+        [id]
+      );
+
+      // For students, get list of group members to evaluate
+      let studentsToEvaluate = [];
+      if (req.user.role === 'student') {
+        const [students] = await conn.execute(
+          `SELECT u.id, u.first_name, u.last_name, u.q_number
+           FROM users u
+           JOIN group_students gs ON u.id = gs.student_id
+           WHERE gs.group_id = ? AND u.id != ?`,
+          [assessment.group_id, req.user.id]
+        );
+
+        studentsToEvaluate = students;
+
+        // Check if student already submitted a response
+        const [existingResponse] = await conn.execute(
+          `SELECT id, feedback, submitted_at FROM responses
+           WHERE assessment_id = ? AND student_id = ?`,
+          [id, req.user.id]
+        );
+
+        if (existingResponse.length > 0) {
+          assessment.responseId = existingResponse[0].id;
+          assessment.feedback = existingResponse[0].feedback;
+          assessment.submitted = existingResponse[0].submitted_at !== null;
+
+          // If submitted, get the scores they gave
+          if (assessment.submitted) {
+            const [givenScores] = await conn.execute(
+              `SELECT r.criteria_id, r.student_id, r.given_score
+               FROM results r
+               WHERE r.response_id = ?`,
+              [existingResponse[0].id]
+            );
+
+            assessment.givenScores = givenScores;
+          }
+        }
+      } else {
+        // For teachers, get all students in the group and their submission status
+        const [students] = await conn.execute(
+          `SELECT u.id, u.first_name, u.last_name, u.q_number,
+                 CASE WHEN r.id IS NOT NULL THEN 1 ELSE 0 END as has_submitted,
+                 r.submitted_at
+           FROM users u
+           JOIN group_students gs ON u.id = gs.student_id
+           LEFT JOIN responses r ON r.student_id = u.id AND r.assessment_id = ?
+           WHERE gs.group_id = ?`,
+          [id, assessment.group_id]
+        );
+
+        studentsToEvaluate = students;
+      }
+
+      conn.release();
+
+      // Build response object
+      const result = {
+        id: assessment.id,
+        title: assessment.title,
+        courseName: assessment.courseName,
+        groupName: assessment.groupName,
+        description: assessment.description,
+        dueDate: assessment.due_date,
+        criteria: criteria,
+        studentsToEvaluate: studentsToEvaluate
+      };
+
+      // Add student-specific data if applicable
+      if (req.user.role === 'student') {
+        result.responseId = assessment.responseId;
+        result.feedback = assessment.feedback;
+        result.submitted = assessment.submitted;
+        result.givenScores = assessment.givenScores || [];
+      }
+
+      res.json(result);
+    } catch (error) {
+      console.error('Error fetching assessment:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
+
+  // Create new assessment (teacher only)
+  router.post('/', authenticateToken, async (req, res) => {
+    try {
+      // Check if user is a teacher
+      if (req.user.role !== 'teacher' && req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Only teachers can create assessments' });
+      }
+
+      const { title, description, courseId, groupId, dueDate, criteria } = req.body;
+
+      if (!title || !courseId || !groupId || !dueDate || !criteria || !criteria.length) {
+        return res.status(400).json({ message: 'Missing required fields' });
+      }
+
+      const conn = await pool.getConnection();
+      await conn.beginTransaction();
+
+      try {
+        // Create assessment
+        const [assessmentResult] = await conn.execute(
+          'INSERT INTO assessments (title, description, course_id, group_id, teacher_id, due_date) VALUES (?, ?, ?, ?, ?, ?)',
+          [title, description, courseId, groupId, req.user.id, dueDate]
+        );
+
+        const assessmentId = assessmentResult.insertId;
+
+        // Create criteria
+        for (const criterion of criteria) {
+          await conn.execute(
+            'INSERT INTO assessment_criteria (assessment_id, name, description, min_score, max_score) VALUES (?, ?, ?, ?, ?)',
+            [assessmentId, criterion.name, criterion.description, criterion.minScore, criterion.maxScore]
+          );
+        }
+
+        await conn.commit();
+        conn.release();
+
+        res.status(201).json({
+          message: 'Assessment created successfully',
+          assessmentId
+        });
+      } catch (error) {
+        await conn.rollback();
+        conn.release();
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error creating assessment:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
+
+  // Submit assessment response
+  router.post('/:id/submit', authenticateToken, async (req, res) => {
+    try {
+      // Only students can submit responses
+      if (req.user.role !== 'student') {
+        return res.status(403).json({ message: 'Only students can submit responses' });
+      }
+
+      const { id } = req.params;
+      const { feedback, scores } = req.body;
+
+      if (!scores || !Array.isArray(scores) || scores.length === 0) {
+        return res.status(400).json({ message: 'No scores provided' });
+      }
+
+      const conn = await pool.getConnection();
+      await conn.beginTransaction();
+
+      try {
+        // Check if assessment exists and if student is in the group
+        const [assessmentCheck] = await conn.execute(
+          `SELECT a.id, a.group_id
+           FROM assessments a
+           JOIN group_students gs ON a.group_id = gs.group_id
+           WHERE a.id = ? AND gs.student_id = ?`,
+          [id, req.user.id]
+        );
+
+        if (assessmentCheck.length === 0) {
+          await conn.rollback();
+          conn.release();
+          return res.status(404).json({ message: 'Assessment not found or you are not in the group' });
+        }
+
+        // Check if student already submitted (can uncomment to prevent resubmissions)
+        /*
+        const [existingResponse] = await conn.execute(
+          `SELECT id FROM responses
+           WHERE assessment_id = ? AND student_id = ? AND submitted_at IS NOT NULL`,
+          [id, req.user.id]
+        );
+
+        if (existingResponse.length > 0) {
+          await conn.rollback();
+          conn.release();
+          return res.status(400).json({ message: 'You have already submitted this assessment' });
+        }
+        */
+
+        // Create or update response
+        let responseId;
+        const [existingResponseCheck] = await conn.execute(
+          `SELECT id FROM responses
+           WHERE assessment_id = ? AND student_id = ?`,
+          [id, req.user.id]
+        );
+
+        if (existingResponseCheck.length > 0) {
+          // Update existing response
+          await conn.execute(
+            `UPDATE responses
+             SET feedback = ?, submitted_at = NOW()
+             WHERE id = ?`,
+            [feedback || null, existingResponseCheck[0].id]
+          );
+          responseId = existingResponseCheck[0].id;
+
+          // Delete any existing results
+          await conn.execute(
+            `DELETE FROM results WHERE response_id = ?`,
+            [responseId]
+          );
+        } else {
+          // Create new response
+          const [responseResult] = await conn.execute(
+            `INSERT INTO responses (assessment_id, student_id, feedback, submitted_at)
+             VALUES (?, ?, ?, NOW())`,
+            [id, req.user.id, feedback || null]
+          );
+          responseId = responseResult.insertId;
+        }
+
+        // Insert scores
+        for (const score of scores) {
+          if (!score.criteriaId || !score.studentId || score.score === undefined) {
+            throw new Error('Invalid score data');
+          }
+
+          await conn.execute(
+            `INSERT INTO results (response_id, criteria_id, student_id, given_score)
+             VALUES (?, ?, ?, ?)`,
+            [responseId, score.criteriaId, score.studentId, score.score]
+          );
+        }
+
+        await conn.commit();
+
+        // Calculate average scores for the students
+        const [avgScores] = await conn.execute(
+          `SELECT student_id, AVG(given_score) as average
+           FROM results
+           WHERE response_id = ?
+           GROUP BY student_id`,
+          [responseId]
+        );
+
+        conn.release();
+
+        res.json({
+          message: 'Assessment submitted successfully',
+          responseId,
+          averageScores: avgScores
+        });
+      } catch (error) {
+        await conn.rollback();
+        conn.release();
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error submitting assessment:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
+
+  // Get assessment results
+  router.get('/:id/results', authenticateToken, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const conn = await pool.getConnection();
+
+      // Check permissions and get basic assessment info
+      const [assessmentRows] = await conn.execute(
+        `SELECT a.*, c.name as courseName, g.name as groupName
+         FROM assessments a
+         JOIN courses c ON a.course_id = c.id
+         JOIN groups g ON a.group_id = g.id
+         WHERE a.id = ?`,
+        [id]
+      );
+
+      if (assessmentRows.length === 0) {
+        conn.release();
+        return res.status(404).json({ message: 'Assessment not found' });
+      }
+
+      const assessment = assessmentRows[0];
+
+      // Check permissions
+      let permissionCheck;
+      if (req.user.role === 'student') {
+        // Students must be in the group
+        [permissionCheck] = await conn.execute(
+          `SELECT 1 FROM group_students
+           WHERE group_id = ? AND student_id = ?`,
+          [assessment.group_id, req.user.id]
+        );
+      } else if (req.user.role === 'teacher') {
+        // Teachers must have created the assessment
+        permissionCheck = assessment.teacher_id === req.user.id ? [1] : [];
+      }
+
+      if (!permissionCheck || permissionCheck.length === 0) {
+        conn.release();
+        return res.status(403).json({ message: 'Not authorized to view these results' });
+      }
+
+      // Get assessment criteria
+      const [criteria] = await conn.execute(
+        `SELECT id, name, description, min_score, max_score
+         FROM assessment_criteria
+         WHERE assessment_id = ?`,
+        [id]
+      );
+
+      // Different data based on role
+      let results;
+
+      if (req.user.role === 'student') {
+        // Students see their own results
+        const [studentResults] = await conn.execute(
+          `SELECT
+             ar.criteria_id,
+             ac.name as criteria_name,
+             AVG(ar.given_score) as average_score,
+             COUNT(ar.id) as number_of_ratings
+           FROM average_results ar
+           JOIN assessment_criteria ac ON ar.criteria_id = ac.id
+           WHERE ar.assessment_id = ? AND ar.student_id = ?
+           GROUP BY ar.criteria_id`,
+          [id, req.user.id]
+        );
+
+        // Get overall average
+        const [overallAvg] = await conn.execute(
+          `SELECT AVG(average_score) as overall_average
+           FROM average_results
+           WHERE assessment_id = ? AND student_id = ?`,
+          [id, req.user.id]
+        );
+
+        results = {
+          criteria: studentResults,
+          overallAverage: overallAvg[0].overall_average ? parseFloat(overallAvg[0].overall_average).toFixed(1) : 'N/A'
+        };
+      } else {
+        // Teachers see results for all students in the group
+        const [studentList] = await conn.execute(
+          `SELECT u.id, u.first_name, u.last_name, u.q_number
+           FROM users u
+           JOIN group_students gs ON u.id = gs.student_id
+           WHERE gs.group_id = ?`,
+          [assessment.group_id]
+        );
+
+        const studentResults = [];
+
+        // For each student, get their average scores by criteria
+        for (const student of studentList) {
+          const [criteriaScores] = await conn.execute(
+            `SELECT
+               ar.criteria_id,
+               ac.name as criteria_name,
+               ar.average_score,
+               (SELECT COUNT(r.id) FROM results r
+                JOIN responses resp ON r.response_id = resp.id
+                WHERE r.criteria_id = ar.criteria_id AND r.student_id = ar.student_id) as number_of_ratings
+             FROM average_results ar
+             JOIN assessment_criteria ac ON ar.criteria_id = ac.id
+             WHERE ar.assessment_id = ? AND ar.student_id = ?`,
+            [id, student.id]
+          );
+
+          // Get overall average for this student
+          const [overallAvg] = await conn.execute(
+            `SELECT AVG(average_score) as overall_average
+             FROM average_results
+             WHERE assessment_id = ? AND student_id = ?`,
+            [id, student.id]
+          );
+
+          studentResults.push({
+            student: {
+              id: student.id,
+              firstName: student.first_name,
+              lastName: student.last_name,
+              qNumber: student.q_number
+            },
+            criteriaScores: criteriaScores,
+            overallAverage: overallAvg[0].overall_average ? parseFloat(overallAvg[0].overall_average).toFixed(1) : 'N/A'
+          });
+        }
+
+        results = studentResults;
+      }
+
+      conn.release();
+
+      res.json({
+        id: assessment.id,
+        title: assessment.title,
+        courseName: assessment.courseName,
+        groupName: assessment.groupName,
+        description: assessment.description,
+        dueDate: assessment.due_date,
+        criteria: criteria,
+        results: results
+      });
+    } catch (error) {
+      console.error('Error fetching assessment results:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
+
+  return router;
+};

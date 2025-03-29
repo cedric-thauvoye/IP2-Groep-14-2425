@@ -7,7 +7,7 @@
                     <p class="subtitle">{{ isTeacher ? 'Manage your courses' : 'Your enrolled courses' }}</p>
                 </div>
                 <div class="actions" v-if="isTeacher">
-                    <button class="action-button create">
+                    <button class="action-button create" @click="showCreateCourseModal = true">
                         <i class="fas fa-plus"></i> Create Course
                     </button>
                 </div>
@@ -47,23 +47,23 @@
                         <div class="course-stats">
                             <div class="stat">
                                 <i class="fas fa-users"></i>
-                                <span>{{ course.students?.length || 0 }} Students</span>
+                                <span>{{ course.student_count || 0 }} Students</span>
                             </div>
                             <div class="stat">
                                 <i class="fas fa-tasks"></i>
-                                <span>{{ course.assessments?.length || 0 }} Assessments</span>
+                                <span>{{ course.assessment_count || 0 }} Assessments</span>
                             </div>
                         </div>
                     </div>
                     <div class="course-footer">
-                        <button class="view-button">
+                        <button class="view-button" @click="viewCourseDetails(course.id)">
                             View Details
                         </button>
                         <div class="teacher-actions" v-if="isTeacher">
-                            <button class="icon-button edit">
+                            <button class="icon-button edit" @click="editCourse(course)">
                                 <i class="fas fa-edit"></i>
                             </button>
-                            <button class="icon-button delete">
+                            <button class="icon-button delete" @click="deleteCourse(course.id)">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </div>
@@ -82,16 +82,17 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { db } from '../main';
-import { getAuth } from 'firebase/auth';
+import { useRouter } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
+import { courseService, authService } from '../services/api';
 
+const router = useRouter();
 const courses = ref([]);
 const loading = ref(true);
 const searchQuery = ref('');
 const semesterFilter = ref('');
 const isTeacher = ref(false);
+const showCreateCourseModal = ref(false);
 
 const getRandomColor = () => {
     const colors = ['#3498db', '#2ecc71', '#e74c3c', '#f1c40f', '#9b59b6', '#1abc9c'];
@@ -107,26 +108,46 @@ const filteredCourses = computed(() => {
         });
 });
 
-onMounted(() => {
-    const auth = getAuth();
-    const user = auth.currentUser;
+const viewCourseDetails = (id) => {
+    router.push(`/course/${id}`);
+};
 
-    if (user) {
-        // TODO: Check if user is teacher from Firestore
-        isTeacher.value = true;
+const editCourse = (course) => {
+    // Implement edit course functionality
+    console.log('Edit course:', course);
+};
 
-        const q = isTeacher.value
-            ? query(collection(db, 'Courses'))
-            : query(collection(db, 'Courses'), where('students', 'array-contains', user.uid));
+const deleteCourse = async (id) => {
+    // Implement delete course functionality
+    if (confirm('Are you sure you want to delete this course?')) {
+        try {
+            // Implement course deletion
+            console.log('Delete course:', id);
+        } catch (error) {
+            console.error('Error deleting course:', error);
+        }
+    }
+};
 
-        onSnapshot(q, (snapshot) => {
-            courses.value = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-                isActive: true
-            }));
-            loading.value = false;
-        });
+onMounted(async () => {
+    try {
+        // Check if user is a teacher
+        const roleResponse = await authService.checkUserRole();
+        isTeacher.value = roleResponse.data.role === 'teacher' || roleResponse.data.role === 'admin';
+
+        // Fetch courses
+        const coursesResponse = await courseService.getCourses(isTeacher.value ? 'true' : false);
+
+        // Transform data with additional properties if needed
+        courses.value = coursesResponse.data.map(course => ({
+            ...course,
+            isActive: true
+        }));
+
+    } catch (error) {
+        console.error('Error fetching courses:', error);
+    } finally {
+        loading.value = false;
     }
 });
 </script>

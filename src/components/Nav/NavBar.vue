@@ -9,10 +9,10 @@
             </button>
 
             <!-- Profile Section -->
-            <div class="profile">
+            <div class="profile" v-if="user">
                 <img :src="user.photoURL || 'https://placehold.co/50'" alt="User Avatar" class="avatar">
                 <div class="profile-info">
-                    <p class="displayName">{{ user.displayName }}</p>
+                    <p class="displayName">{{ user.firstName || user.first_name }} {{ user.lastName || user.last_name }}</p>
                     <p class="role">{{ userRole }}</p>
                 </div>
             </div>
@@ -67,12 +67,11 @@
 </template>
 
 <script setup>
-import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
 import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import NavOption from './NavOption.vue';
+import { authService } from '../../services/api';
 
-const auth = getAuth();
 const user = ref(null);
 const isNavBarVisible = ref(false);
 const isSmallScreen = ref(window.innerWidth < 1150);
@@ -100,25 +99,55 @@ onBeforeUnmount(() => {
     window.removeEventListener('resize', updateScreenSize);
 });
 
-const signOutUser = () => {
-    signOut(auth).then(() => {
+const signOutUser = async () => {
+    try {
+        // Clear local tokens
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user_data');
         user.value = null;
-        router.push('/');
-    }).catch((error) => {
+
+        // Just navigate to login page, without Microsoft logout
+        router.push('/?logout=true');
+    } catch (error) {
         console.error("Sign out error:", error);
-    });
+        // Fallback: force navigation to login
+        window.location.href = '/';
+    }
 };
 
 const userRole = ref('Student');
 const isTeacher = ref(false);
 
-onMounted(() => {
-    onAuthStateChanged(auth, (loggedInUser) => {
-        user.value = loggedInUser;
-        // TODO: Get user role from Firestore
-        isTeacher.value = true; // Set this based on user's role
-        userRole.value = isTeacher.value ? 'Teacher' : 'Student';
-    });
+onMounted(async () => {
+    // Check if there's a saved token
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+        try {
+            const response = await authService.getCurrentUser();
+            console.table(response.data.user);
+            // Handle different property naming conventions that might come from the API
+            user.value = {
+                ...response.data.user,
+                firstName: response.data.user.first_name || response.data.user.firstName,
+                lastName: response.data.user.last_name || response.data.user.lastName
+            };
+
+            console.log("user", user.value);
+
+            // Get user role
+            const roleResponse = await authService.checkUserRole();
+            isTeacher.value = roleResponse.data.role === 'teacher' || roleResponse.data.role === 'admin';
+            userRole.value = isTeacher.value ? 'Teacher' : 'Student';
+        } catch (error) {
+            console.error('Failed to retrieve user:', error);
+            // Clear invalid token
+            localStorage.removeItem('auth_token');
+            router.push('/');
+        }
+    } else {
+        router.push('/');
+    }
+
     updateScreenSize();
 });
 </script>

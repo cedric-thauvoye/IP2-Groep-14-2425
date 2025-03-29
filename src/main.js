@@ -5,29 +5,13 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 
-import { initializeApp } from 'firebase/app'
-import { getAnalytics } from 'firebase/analytics'
-import { getFirestore } from 'firebase/firestore'
+// Log environment variables for debugging (will be removed in production)
+console.log('Environment variables:');
+console.log('VITE_AZURE_CLIENT_ID:', import.meta.env.VITE_AZURE_CLIENT_ID || '08c46765-3002-426c-bdef-284ecfee5a40');
+console.log('VITE_AZURE_TENANT_ID:', import.meta.env.VITE_AZURE_TENANT_ID || '5e74901d-334f-46e3-96d1-47d842585abd');
+console.log('API URL:', import.meta.env.VUE_APP_API_URL || 'http://localhost:3000/api');
 
-const firebaseConfig = {
-    apiKey: 'AIzaSyAoYnXc1dhvCsc0J5tZ3fMH9A9cEHZ7JE0',
-    authDomain: 'peerevaluation-odisee.firebaseapp.com',
-    databaseURL: 'https://peerevaluation-odisee-default-rtdb.europe-west1.firebasedatabase.app',
-    projectId: 'peerevaluation-odisee',
-    storageBucket: 'peerevaluation-odisee.firebasestorage.app',
-    messagingSenderId: '704206259117',
-    appId: '1:704206259117:web:5947ed34a7d13d8efbd724',
-    measurementId: 'G-BL43TD4PRB',
-}
-
-const fApp = initializeApp(firebaseConfig)
-const analytics = getAnalytics(fApp)
-const db = getFirestore(fApp)
-
-export { db }
-
+// Simple app initialization
 const app = createApp(App)
-
 app.use(router)
-
 app.mount('#app')

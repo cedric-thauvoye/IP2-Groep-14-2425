@@ -4,7 +4,7 @@
             <div class="header">
                 <h1>Groups</h1>
                 <div class="actions" v-if="isTeacher">
-                    <button class="action-button">
+                    <button class="action-button" @click="showCreateGroupModal = true">
                         <i class="fas fa-plus"></i> Create Group
                     </button>
                     <button class="action-button import">
@@ -13,15 +13,20 @@
                 </div>
             </div>
 
-            <div class="groups-grid">
+            <div v-if="loading" class="loading-state">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Loading groups...</p>
+            </div>
+
+            <div v-else-if="groups.length > 0" class="groups-grid">
                 <div v-for="group in groups" :key="group.id" class="group-card">
                     <div class="group-header">
                         <h3>{{ group.name }}</h3>
                         <span class="member-count">
-                            <i class="fas fa-users"></i> {{ group.students?.length || 0 }}
+                            <i class="fas fa-users"></i> {{ group.student_count || 0 }}
                         </span>
                     </div>
-                    <p class="course-name">{{ group.courseName }}</p>
+                    <p class="course-name">{{ group.course_name }}</p>
                     <div class="group-content">
                         <p class="description">{{ group.description || 'No description available' }}</p>
                     </div>
@@ -30,15 +35,21 @@
                             View Details
                         </router-link>
                         <div class="actions" v-if="isTeacher">
-                            <button class="icon-button edit">
+                            <button class="icon-button edit" @click="editGroup(group)">
                                 <i class="fas fa-edit"></i>
                             </button>
-                            <button class="icon-button delete">
+                            <button class="icon-button delete" @click="deleteGroup(group.id)">
                                 <i class="fas fa-trash"></i>
                             </button>
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <div v-else class="empty-state">
+                <i class="fas fa-users"></i>
+                <h3>No Groups Found</h3>
+                <p>{{ isTeacher ? 'Create a new group to get started' : 'You are not a member of any groups yet' }}</p>
             </div>
         </div>
     </PageLayout>
@@ -46,21 +57,47 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
-import { collection, query, onSnapshot } from 'firebase/firestore';
-import { db } from '../main';
+import { useRouter } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
+import { groupService, authService } from '../services/api';
 
+const router = useRouter();
 const groups = ref([]);
-const isTeacher = ref(true); // TODO: Implement proper role check
+const loading = ref(true);
+const isTeacher = ref(false);
+const showCreateGroupModal = ref(false);
 
-onMounted(() => {
-    const q = query(collection(db, 'Groups'));
-    onSnapshot(q, (querySnapshot) => {
-        groups.value = querySnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        }));
-    });
+const editGroup = (group) => {
+    // Implement edit group functionality
+    console.log('Edit group:', group);
+};
+
+const deleteGroup = async (id) => {
+    if (confirm('Are you sure you want to delete this group?')) {
+        try {
+            // In a real implementation, you would call an API to delete the group
+            console.log('Delete group:', id);
+            groups.value = groups.value.filter(group => group.id !== id);
+        } catch (error) {
+            console.error('Error deleting group:', error);
+        }
+    }
+};
+
+onMounted(async () => {
+    try {
+        // Check if user is a teacher
+        const roleResponse = await authService.checkUserRole();
+        isTeacher.value = roleResponse.data.role === 'teacher' || roleResponse.data.role === 'admin';
+
+        // Fetch groups
+        const response = await groupService.getGroups();
+        groups.value = response.data;
+    } catch (error) {
+        console.error('Error fetching groups:', error);
+    } finally {
+        loading.value = false;
+    }
 });
 </script>
 
@@ -106,6 +143,31 @@ onMounted(() => {
 
 .action-button:hover {
     opacity: 0.9;
+}
+
+.loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #7f8c8d;
+    font-size: 1rem;
+    margin: 2rem 0;
+}
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #7f8c8d;
+    font-size: 1rem;
+    margin: 2rem 0;
+}
+
+.empty-state i {
+    font-size: 2rem;
+    margin-bottom: 1rem;
 }
 
 .groups-grid {

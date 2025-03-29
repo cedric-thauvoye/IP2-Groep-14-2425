@@ -3,15 +3,23 @@
 </template>
 
 <script setup>
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { ref, onMounted } from 'vue';
+import { authService } from './services/api';
 
-const auth = getAuth();
 const user = ref(null);
 
-onMounted(() => {
-	onAuthStateChanged(auth, (loggedInUser) => {
-		user.value = loggedInUser;
-	});
+onMounted(async () => {
+	// Check if there's a saved token
+	const token = localStorage.getItem('auth_token');
+	if (token) {
+		try {
+			const response = await authService.getCurrentUser();
+			user.value = response.data.user;
+		} catch (error) {
+			console.error('Failed to retrieve user:', error);
+			// Clear invalid token
+			localStorage.removeItem('auth_token');
+		}
+	}
 });
 </script>

@@ -3,7 +3,7 @@
         <div v-if="user" class="dashboard">
             <!-- Welcome Section -->
             <div class="welcome-section">
-                <h1>Welcome back, {{ user.displayName }}!</h1>
+                <h1>Welcome back, {{ user.firstName || user.first_name }} {{ user.lastName || user.last_name }}!</h1>
                 <p class="subtitle">{{ getCurrentDateTime() }}</p>
             </div>
 
@@ -27,14 +27,14 @@
                     <i class="fas fa-tasks"></i>
                     <div class="stat-content">
                         <h3>Pending Assessments</h3>
-                        <p class="stat-number">{{ pendingAssessments }}</p>
+                        <p class="stat-number">{{ pendingAssessments.length }}</p>
                     </div>
                 </div>
                 <div class="stat-card">
                     <i class="fas fa-chart-line"></i>
                     <div class="stat-content">
                         <h3>Completed Assessments</h3>
-                        <p class="stat-number">{{ completedAssessments }}</p>
+                        <p class="stat-number">{{ completedAssessments.length }}</p>
                     </div>
                 </div>
             </div>
@@ -99,16 +99,16 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
-import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { db } from '../main';
+import { useRouter } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
+import { authService, courseService, groupService, assessmentService } from '../services/api';
 
-const auth = getAuth();
+const router = useRouter();
 const user = ref(null);
 const courses = ref([]);
-const pendingAssessments = ref(0);
-const completedAssessments = ref(0);
+const groups = ref([]);
+const pendingAssessments = ref([]);
+const completedAssessments = ref([]);
 const recentActivities = ref([
     {
         type: 'assessment',
@@ -141,39 +141,51 @@ const getRandomColor = () => {
     return colors[Math.floor(Math.random() * colors.length)];
 };
 
-onMounted(() => {
-    onAuthStateChanged(auth, (loggedInUser) => {
-        user.value = loggedInUser;
-        if (loggedInUser) {
-            // Fetch courses
-            const qCourses = query(
-                collection(db, 'Courses'),
-                where('students', 'array-contains', loggedInUser.uid)
-            );
-            onSnapshot(qCourses, (snapshot) => {
-                courses.value = snapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
-            });
-
-            // Fetch groups
-            const qGroups = query(
-                collection(db, 'Groups'),
-                where('students', 'array-contains', loggedInUser.uid)
-            );
-            onSnapshot(qGroups, (snapshot) => {
-                groups.value = snapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                }));
-            });
-
-            // TODO: Implement assessment statistics
-            pendingAssessments.value = 3;
-            completedAssessments.value = 12;
+onMounted(async () => {
+    try {
+        // Check if user is authenticated
+        const token = localStorage.getItem('auth_token');
+        if (!token) {
+            router.push('/');
+            return;
         }
-    });
+
+        // Get current user
+        const userResponse = await authService.getCurrentUser();
+        console.log('User data received:', userResponse.data);
+
+        // Normalize user data to handle different property naming conventions
+        user.value = {
+            ...userResponse.data.user,
+            firstName: userResponse.data.user.first_name || userResponse.data.user.firstName,
+            lastName: userResponse.data.user.last_name || userResponse.data.user.lastName,
+            // Add any other properties that might have different naming
+        };
+
+        // Fetch courses
+        const coursesResponse = await courseService.getCourses();
+        console.log('Courses data received:', coursesResponse.data);
+        courses.value = coursesResponse.data;
+
+        // Fetch groups
+        const groupsResponse = await groupService.getGroups();
+        groups.value = groupsResponse.data;
+
+        // Fetch pending assessments
+        const pendingResponse = await assessmentService.getPendingAssessments();
+        pendingAssessments.value = pendingResponse.data;
+
+        // Fetch completed assessments
+        const completedResponse = await assessmentService.getCompletedAssessments();
+        completedAssessments.value = completedResponse.data;
+
+    } catch (error) {
+        console.error('Error loading dashboard data:', error);
+        if (error.response && error.response.status === 401) {
+            localStorage.removeItem('auth_token');
+            router.push('/');
+        }
+    }
 });
 </script>
 

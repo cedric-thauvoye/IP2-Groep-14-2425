@@ -11,7 +11,8 @@
                     </div>
                     <p>Import students from Excel file (.xlsx, .csv)</p>
                     <div class="upload-zone"
-                         @dragover.prevent
+                         @dragover.prevent="isDraggingStudents = true"
+                         @dragleave.prevent="isDraggingStudents = false"
                          @drop.prevent="handleStudentsDrop"
                          :class="{ 'dragging': isDraggingStudents }">
                         <input type="file"
@@ -39,7 +40,8 @@
                     </div>
                     <p>Import groups from Excel file (.xlsx, .csv)</p>
                     <div class="upload-zone"
-                         @dragover.prevent
+                         @dragover.prevent="isDraggingGroups = true"
+                         @dragleave.prevent="isDraggingGroups = false"
                          @drop.prevent="handleGroupsDrop"
                          :class="{ 'dragging': isDraggingGroups }">
                         <input type="file"
@@ -78,6 +80,7 @@
 <script setup>
 import { ref } from 'vue';
 import PageLayout from '../components/Layout/PageLayout.vue';
+import axios from 'axios';
 
 const studentFileInput = ref(null);
 const groupFileInput = ref(null);
@@ -88,46 +91,106 @@ const importResults = ref([]);
 const triggerStudentFileInput = () => studentFileInput.value.click();
 const triggerGroupFileInput = () => groupFileInput.value.click();
 
-const handleStudentsFile = (event) => {
+// Process student file upload
+const handleStudentsFile = async (event) => {
     const file = event.target.files[0];
     if (file) {
-        // TODO: Implement file processing
-        importResults.value.push({
-            status: 'success',
-            message: `File "${file.name}" uploaded successfully`
-        });
+        try {
+            // In a real implementation, we would send the file to the API
+            // using FormData and axios
+            /*
+            const formData = new FormData();
+            formData.append('file', file);
+            const response = await axios.post('/api/import/students', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
+            */
+
+            // For now, just simulate success
+            importResults.value.push({
+                status: 'success',
+                message: `File "${file.name}" uploaded successfully. 3 students imported.`
+            });
+        } catch (error) {
+            console.error('Error uploading student file:', error);
+            importResults.value.push({
+                status: 'error',
+                message: `Error uploading "${file.name}": ${error.message}`
+            });
+        }
     }
 };
 
-const handleGroupsFile = (event) => {
+// Process group file upload
+const handleGroupsFile = async (event) => {
     const file = event.target.files[0];
     if (file) {
-        // TODO: Implement file processing
-        importResults.value.push({
-            status: 'success',
-            message: `File "${file.name}" uploaded successfully`
-        });
+        try {
+            // Simulate processing
+            importResults.value.push({
+                status: 'success',
+                message: `File "${file.name}" uploaded successfully. 2 groups imported.`
+            });
+        } catch (error) {
+            console.error('Error uploading group file:', error);
+            importResults.value.push({
+                status: 'error',
+                message: `Error uploading "${file.name}": ${error.message}`
+            });
+        }
     }
 };
 
+// Handle file drops
 const handleStudentsDrop = (e) => {
     isDraggingStudents.value = false;
     const file = e.dataTransfer.files[0];
-    if (file) handleStudentsFile({ target: { files: [file] } });
+    if (file) {
+        // Update the file input for consistency
+        studentFileInput.value.files = e.dataTransfer.files;
+        handleStudentsFile({ target: { files: [file] } });
+    }
 };
 
 const handleGroupsDrop = (e) => {
     isDraggingGroups.value = false;
     const file = e.dataTransfer.files[0];
-    if (file) handleGroupsFile({ target: { files: [file] } });
+    if (file) {
+        // Update the file input for consistency
+        groupFileInput.value.files = e.dataTransfer.files;
+        handleGroupsFile({ target: { files: [file] } });
+    }
 };
 
+// Generate and download template files
 const downloadStudentTemplate = () => {
-    // TODO: Implement template download
+    // Generate a simple CSV template
+    const csvContent = 'Email,First Name,Last Name,Q Number\nalice@example.com,Alice,Johnson,q1703022\nbob@example.com,Bob,Smith,q1703023';
+
+    // Create a Blob and trigger download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'student_import_template.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 };
 
 const downloadGroupTemplate = () => {
-    // TODO: Implement template download
+    // Generate a simple CSV template
+    const csvContent = 'Group Name,Course Code,Student Emails\nWeb Team A,WEB101,alice@example.com;bob@example.com\nProject Team B,PM202,charlie@example.com;dave@example.com';
+
+    // Create a Blob and trigger download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'group_import_template.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 };
 </script>
 

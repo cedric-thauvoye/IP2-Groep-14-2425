@@ -30,7 +30,12 @@
                 </div>
             </div>
 
-            <div class="results-grid">
+            <div v-if="loading" class="loading-state">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Loading results...</p>
+            </div>
+
+            <div v-else class="results-grid">
                 <div class="results-card summary">
                     <h2>Summary</h2>
                     <div class="summary-stats">
@@ -90,32 +95,23 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
+import { courseService, assessmentService } from '../services/api';
 
+const router = useRouter();
+const loading = ref(true);
 const selectedCourse = ref('');
 const selectedPeriod = ref('all');
-const results = ref([
-    {
-        id: 1,
-        studentName: 'Nabil Zahmidi',
-        assessmentTitle: 'Web Development Final',
-        courseName: 'Web Development',
-        score: 8.5,
-        date: '2024-01-15'
-    },
-    // Add more mock data...
-]);
+const results = ref([]);
+const courses = ref([]);
 
-const courses = ref([
-    { id: 1, name: 'Web Development' },
-    { id: 2, name: 'Project Management' },
-    // Add more courses...
-]);
-
+// Mock data for testing
 const totalAssessments = computed(() => results.value.length);
 const averageScore = computed(() => {
-    const scores = results.value.map(r => r.score);
+    if (results.value.length === 0) return 0;
+    const scores = results.value.map(r => parseFloat(r.score));
     return scores.reduce((a, b) => a + b, 0) / scores.length;
 });
 const completionRate = computed(() => 85); // Mock data
@@ -123,9 +119,20 @@ const completionRate = computed(() => 85); // Mock data
 const filteredResults = computed(() => {
     let filtered = [...results.value];
     if (selectedCourse.value) {
-        filtered = filtered.filter(r => r.courseId === selectedCourse.value);
+        filtered = filtered.filter(r => r.courseId === parseInt(selectedCourse.value));
     }
+
     // Add period filtering logic
+    if (selectedPeriod.value === 'month') {
+        const oneMonthAgo = new Date();
+        oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+        filtered = filtered.filter(r => new Date(r.date) >= oneMonthAgo);
+    } else if (selectedPeriod.value === 'semester') {
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+        filtered = filtered.filter(r => new Date(r.date) >= sixMonthsAgo);
+    }
+
     return filtered;
 });
 
@@ -138,6 +145,7 @@ const formatDate = (date) => {
 };
 
 const getScoreClass = (score) => {
+    score = parseFloat(score);
     if (score >= 8) return 'excellent';
     if (score >= 6) return 'good';
     return 'needs-improvement';
@@ -166,8 +174,53 @@ const exportResults = () => {
 };
 
 const viewDetail = (id) => {
-    router.push(`/assessment/${id}/detail`);
+    router.push(`/assessment/${id}/results`);
 };
+
+// Fetch data from API
+onMounted(async () => {
+    try {
+        // Fetch courses for filter dropdown
+        const coursesResponse = await courseService.getCourses(true); // teacher courses
+        courses.value = coursesResponse.data;
+
+        // We would fetch results from an API endpoint, but for now use mock data
+        // In the future, implement an API endpoint for getting all assessment results
+        results.value = [
+            {
+                id: 1,
+                studentName: 'Alice Johnson',
+                assessmentTitle: 'Web Development Final',
+                courseName: 'Web Development',
+                courseId: 1,
+                score: '8.5',
+                date: '2024-01-15'
+            },
+            {
+                id: 2,
+                studentName: 'Bob Smith',
+                assessmentTitle: 'Database Project',
+                courseName: 'Database Design',
+                courseId: 3,
+                score: '7.2',
+                date: '2024-01-20'
+            },
+            {
+                id: 3,
+                studentName: 'Charlie Davis',
+                assessmentTitle: 'Team Collaboration',
+                courseName: 'Project Management',
+                courseId: 2,
+                score: '9.0',
+                date: '2024-01-10'
+            }
+        ];
+    } catch (error) {
+        console.error('Error loading results data:', error);
+    } finally {
+        loading.value = false;
+    }
+});
 </script>
 
 <style scoped>
@@ -322,6 +375,15 @@ td {
 
 .action-button:hover {
     background-color: #219a52;
+}
+
+.loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    color: #7f8c8d;
 }
 
 @media (max-width: 768px) {
