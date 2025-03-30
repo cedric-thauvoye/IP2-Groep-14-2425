@@ -1,3 +1,12 @@
+-- Peer Assessment Database Schema
+-- 
+-- MANUAL EXECUTION INSTRUCTIONS:
+-- 1. Create the database: CREATE DATABASE IF NOT EXISTS peer_evaluation;
+-- 2. Use the database: USE peer_evaluation;
+-- 3. Execute this file in your MySQL client
+--
+-- NOTE: This file should be executed manually, not automatically by the application
+
 -- Create Users Table (students & teachers) if not exists
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -36,6 +45,50 @@ CREATE TABLE IF NOT EXISTS course_teachers (
     FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE,
     UNIQUE(course_id, teacher_id)
 );
+
+-- Add constraint to the course_teachers table
+ALTER TABLE course_teachers
+ADD CONSTRAINT check_teacher_role
+FOREIGN KEY (teacher_id) REFERENCES users(id)
+ON DELETE CASCADE
+ON UPDATE CASCADE;
+
+-- Teacher role check trigger (MySQL version)
+-- NOTE: Execute this separately in your MySQL client if needed
+/*
+CREATE TRIGGER check_teacher_role_before_insert
+BEFORE INSERT ON course_teachers
+FOR EACH ROW
+BEGIN
+    DECLARE user_role VARCHAR(50);
+    SELECT role INTO user_role FROM users WHERE id = NEW.teacher_id;
+    
+    IF user_role != 'teacher' AND user_role != 'admin' THEN
+        SIGNAL SQLSTATE '45000' 
+        SET MESSAGE_TEXT = 'Only users with teacher or admin role can be added as course teachers';
+    END IF;
+END;
+*/
+
+-- Prevent role changes trigger (MySQL version)
+-- NOTE: Execute this separately in your MySQL client if needed
+/*
+CREATE TRIGGER prevent_teacher_role_change
+BEFORE UPDATE ON users
+FOR EACH ROW
+BEGIN
+    IF OLD.role IN ('teacher', 'admin') AND NEW.role = 'student' THEN
+        -- Check if user is a teacher for any course
+        DECLARE course_count INT;
+        SELECT COUNT(*) INTO course_count FROM course_teachers WHERE teacher_id = OLD.id;
+        
+        IF course_count > 0 THEN
+            SIGNAL SQLSTATE '45000' 
+            SET MESSAGE_TEXT = 'Cannot change role to student: user is a teacher for one or more courses';
+        END IF;
+    END IF;
+END;
+*/
 
 -- Create Course Students Junction Table if not exists
 CREATE TABLE IF NOT EXISTS course_students (
@@ -140,9 +193,8 @@ JOIN
 GROUP BY 
     ac.assessment_id, r.student_id, ac.id;
 
--- Insert sample data only if tables are empty
--- This ensures we don't duplicate data on schema updates
-
+-- Insert sample data 
+-- NOTE: You can comment this out if you don't want sample data
 -- Insert sample users if none exist
 INSERT INTO users (email, password, first_name, last_name, role, q_number)
 SELECT 'teacher1@example.com', '$2a$10$uJ5YQtYtTLJlRPbC0MXGz.7yZ0vtRJ.BtIOmKHw9/BGGPYxvgAfFS', 'John', 'Doe', 'teacher', NULL

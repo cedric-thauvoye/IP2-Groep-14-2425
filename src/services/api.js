@@ -43,6 +43,7 @@ export const authService = {
   getCurrentUser: () => apiClient.get('/auth/me'),
   checkUserRole: () => apiClient.get('/auth/role'),
   loginWithMicrosoft: (msalToken) => apiClient.post('/auth/microsoft', { token: msalToken }),
+  verifyPassword: (password) => apiClient.post('/auth/verify-password', { password }),
 };
 
 // Assessment services
@@ -65,6 +66,7 @@ export const courseService = {
   updateCourse: (id, course) => apiClient.put(`/courses/${id}`, course),
   addStudentToCourse: (courseId, studentId) => apiClient.post(`/courses/${courseId}/students`, { studentId }),
   removeStudentFromCourse: (courseId, studentId) => apiClient.delete(`/courses/${courseId}/students/${studentId}`),
+  addTeacherToCourse: (courseId, teacherId) => apiClient.post(`/courses/${courseId}/teachers`, { teacherId }),
 };
 
 // Group services
@@ -82,6 +84,7 @@ export const userService = {
   getStudents: () => apiClient.get('/users/students'),
   getTeachers: () => apiClient.get('/users/teachers'),
   getUserById: (id) => apiClient.get(`/users/${id}`),
+  getAllUsers: () => apiClient.get('/users/all'), // Changed this to hit the right endpoint
   createUser: (userData) => apiClient.post('/users', userData),
   updateUser: (id, userData) => apiClient.put(`/users/${id}`, userData),
   deleteUser: (id) => apiClient.delete(`/users/${id}`),

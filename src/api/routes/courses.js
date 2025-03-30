@@ -20,42 +20,91 @@ module.exports = (pool) => {
     }
   };
 
-  // Get all courses (for teachers)
-  // Students only get courses they're enrolled in
+  // Get all courses (or courses taught by a teacher)
   router.get('/', authenticateToken, async (req, res) => {
     try {
-      const conn = await pool.getConnection();
+      const userId = req.user.id;
+      const isTeaching = req.query.teaching === 'true';
+      const isAdmin = req.user.role === 'admin';
 
+      const conn = await pool.getConnection();
       let query, params;
 
-      if (req.user.role === 'teacher' || req.user.role === 'admin') {
-        // Teachers see all courses or optionally just courses they teach
-        if (req.query.teaching === 'true') {
-          query = `
-            SELECT c.*
-            FROM courses c
-            JOIN course_teachers ct ON c.id = ct.course_id
-            WHERE ct.teacher_id = ?
-            ORDER BY c.name`;
-          params = [req.user.id];
-        } else {
-          query = `SELECT * FROM courses ORDER BY name`;
-          params = [];
-        }
-      } else {
-        // Students see only courses they're enrolled in
+      if (isAdmin && isTeaching) {
+        // Admin requesting all courses
         query = `
-          SELECT c.*
+          SELECT
+            c.*,
+            (SELECT COUNT(*) FROM course_students cs WHERE cs.course_id = c.id) as student_count,
+            (SELECT COUNT(*) FROM course_teachers ct WHERE ct.course_id = c.id) as teacher_count,
+            (SELECT COUNT(*) FROM \`groups\` g WHERE g.course_id = c.id) as group_count
+          FROM courses c
+          ORDER BY c.name
+        `;
+        params = [];
+      } else if (req.user.role === 'teacher' && isTeaching) {
+        // Teacher requesting courses they teach
+        query = `
+          SELECT
+            c.*,
+            (SELECT COUNT(*) FROM course_students cs WHERE cs.course_id = c.id) as student_count,
+            (SELECT COUNT(*) FROM course_teachers ct WHERE ct.course_id = c.id) as teacher_count,
+            (SELECT COUNT(*) FROM \`groups\` g WHERE g.course_id = c.id) as group_count
+          FROM courses c
+          JOIN course_teachers ct ON c.id = ct.course_id
+          WHERE ct.teacher_id = ?
+          ORDER BY c.name
+        `;
+        params = [userId];
+      } else if (req.user.role === 'student') {
+        // Student requesting courses they're enrolled in
+        query = `
+          SELECT
+            c.*,
+            (SELECT COUNT(*) FROM course_students cs WHERE cs.course_id = c.id) as student_count,
+            (SELECT COUNT(*) FROM course_teachers ct WHERE ct.course_id = c.id) as teacher_count,
+            (SELECT COUNT(*) FROM \`groups\` g WHERE g.course_id = c.id) as group_count
           FROM courses c
           JOIN course_students cs ON c.id = cs.course_id
           WHERE cs.student_id = ?
-          ORDER BY c.name`;
-        params = [req.user.id];
+          ORDER BY c.name
+        `;
+        params = [userId];
+      } else {
+        // Default: get all courses the user has access to
+        if (req.user.role === 'teacher' || req.user.role === 'admin') {
+          query = `
+            SELECT
+              c.*,
+              (SELECT COUNT(*) FROM course_students cs WHERE cs.course_id = c.id) as student_count,
+              (SELECT COUNT(*) FROM course_teachers ct WHERE ct.course_id = c.id) as teacher_count,
+              (SELECT COUNT(*) FROM \`groups\` g WHERE g.course_id = c.id) as group_count
+            FROM courses c
+            JOIN course_teachers ct ON c.id = ct.course_id
+            WHERE ct.teacher_id = ?
+            ORDER BY c.name
+          `;
+        } else {
+          query = `
+            SELECT
+              c.*,
+              (SELECT COUNT(*) FROM course_students cs WHERE cs.course_id = c.id) as student_count,
+              (SELECT COUNT(*) FROM course_teachers ct WHERE ct.course_id = c.id) as teacher_count,
+              (SELECT COUNT(*) FROM \`groups\` g WHERE g.course_id = c.id) as group_count
+            FROM courses c
+            JOIN course_students cs ON c.id = cs.course_id
+            WHERE cs.student_id = ?
+            ORDER BY c.name
+          `;
+        }
+        params = [userId];
       }
 
+      // Execute query
       const [rows] = await conn.execute(query, params);
       conn.release();
 
+      // Return the data
       res.json(rows);
     } catch (error) {
       console.error('Error fetching courses:', error);
@@ -333,6 +382,71 @@ module.exports = (pool) => {
       res.status(201).json({ message: 'Student added to course successfully' });
     } catch (error) {
       console.error('Error adding student to course:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
+
+  // Add a teacher to a course
+  router.post('/:id/teachers', authenticateToken, async (req, res) => {
+    try {
+      // Only teachers can add other teachers
+      if (req.user.role !== 'teacher' && req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Only teachers can add other teachers to courses' });
+      }
+
+      const { id } = req.params;
+      const { teacherId } = req.body;
+
+      if (!teacherId) {
+        return res.status(400).json({ message: 'Teacher ID is required' });
+      }
+
+      const conn = await pool.getConnection();
+
+      // Check if user is a teacher of this course
+      const [isTeacher] = await conn.execute(
+        'SELECT 1 FROM course_teachers WHERE course_id = ? AND teacher_id = ?',
+        [id, req.user.id]
+      );
+
+      if (isTeacher.length === 0 && req.user.role !== 'admin') {
+        conn.release();
+        return res.status(403).json({ message: 'You are not a teacher of this course' });
+      }
+
+      // Check if the user to be added has a teacher role
+      const [teacherCheck] = await conn.execute(
+        'SELECT 1 FROM users WHERE id = ? AND (role = "teacher" OR role = "admin")',
+        [teacherId]
+      );
+
+      if (teacherCheck.length === 0) {
+        conn.release();
+        return res.status(400).json({ message: 'Only users with teacher or admin role can be added as course teachers' });
+      }
+
+      // Check if teacher is already in the course
+      const [existingTeacher] = await conn.execute(
+        'SELECT 1 FROM course_teachers WHERE course_id = ? AND teacher_id = ?',
+        [id, teacherId]
+      );
+
+      if (existingTeacher.length > 0) {
+        conn.release();
+        return res.status(400).json({ message: 'Teacher is already assigned to this course' });
+      }
+
+      // Add teacher to course
+      await conn.execute(
+        'INSERT INTO course_teachers (course_id, teacher_id) VALUES (?, ?)',
+        [id, teacherId]
+      );
+
+      conn.release();
+
+      res.status(201).json({ message: 'Teacher added to course successfully' });
+    } catch (error) {
+      console.error('Error adding teacher to course:', error);
       res.status(500).json({ message: 'Server error' });
     }
   });

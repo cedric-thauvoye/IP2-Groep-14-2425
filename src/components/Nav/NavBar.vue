@@ -46,6 +46,14 @@
                     </NavOption>
                 </div>
 
+                <!-- Admin Section -->
+                <div class="nav-section" v-if="isAdmin">
+                    <h3>Administration</h3>
+                    <NavOption to="/admin">
+                        <i class="fas fa-cog"></i> Admin Dashboard
+                    </NavOption>
+                </div>
+
                 <div class="nav-section">
                     <h3>Assessments</h3>
                     <NavOption to="/assessments">
@@ -117,6 +125,22 @@ const signOutUser = async () => {
 
 const userRole = ref('Student');
 const isTeacher = ref(false);
+const isAdmin = ref(false);
+
+const checkUserRole = async () => {
+    try {
+        const roleResponse = await authService.checkUserRole();
+        console.log('NavBar - User role check response:', roleResponse.data);
+        isTeacher.value = roleResponse.data.role === 'teacher' || roleResponse.data.role === 'admin';
+        isAdmin.value = roleResponse.data.role === 'admin';
+        console.log('NavBar - isAdmin:', isAdmin.value);
+        userRole.value = roleResponse.data.role === 'admin'
+                        ? 'Administrator'
+                        : (isTeacher.value ? 'Teacher' : 'Student');
+    } catch (error) {
+        console.error('Error checking user role:', error);
+    }
+};
 
 onMounted(async () => {
     // Check if there's a saved token
@@ -134,10 +158,8 @@ onMounted(async () => {
 
             console.log("user", user.value);
 
-            // Get user role
-            const roleResponse = await authService.checkUserRole();
-            isTeacher.value = roleResponse.data.role === 'teacher' || roleResponse.data.role === 'admin';
-            userRole.value = isTeacher.value ? 'Teacher' : 'Student';
+            // Get user role - use the new function
+            await checkUserRole();
         } catch (error) {
             console.error('Failed to retrieve user:', error);
             // Clear invalid token

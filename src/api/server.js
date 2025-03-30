@@ -32,70 +32,45 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// MySQL Connection Pool
+// Create a database connection pool
 const pool = mysql.createPool({
-  host: process.env.MYSQL_HOST || '192.168.1.10',
-  user: process.env.MYSQL_USER || 'peer_evaluation',
-  password: process.env.MYSQL_PASSWORD || 'aX68d4t78sytHo4VaYck',
-  database: process.env.MYSQL_DATABASE || 'peer_evaluation',
-  ssl: process.env.MYSQL_SSL === 'true' ? {
-    rejectUnauthorized: true
-  } : false
+  host: process.env.MYSQL_HOST,
+  user: process.env.MYSQL_USER,
+  password: process.env.MYSQL_PASSWORD,
+  database: process.env.MYSQL_DATABASE,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
 });
 
-// Initialize the database if needed
-const initializeDatabase = async () => {
-  if (process.env.NODE_ENV !== 'production') {
-    try {
-      // Check if schema file exists
-      const schemaPath = path.join(__dirname, 'database', 'schema.sql');
-      if (fs.existsSync(schemaPath)) {
-        const schemaSQL = fs.readFileSync(schemaPath, 'utf8');
-        const connection = await pool.getConnection();
-
-        // Split schema into individual statements
-        const statements = schemaSQL.split(';').filter(stmt => stmt.trim() !== '');
-
-        for (const statement of statements) {
-          if (statement.trim()) {
-            await connection.query(statement + ';');
-          }
-        }
-
-        connection.release();
-        console.log('Database schema initialized');
-      }
-    } catch (error) {
-      console.error('Error initializing database schema:', error);
-    }
+// Test database connection without auto-executing schema
+const testDatabaseConnection = async () => {
+  try {
+    const connection = await pool.getConnection();
+    console.log('Connected to MySQL database!');
+    connection.release();
+    return true;
+  } catch (err) {
+    console.error('Database connection error:', err);
+    console.error('Please ensure the database is created and credentials are correct.');
+    console.error('Manual schema setup is required - run the schema.sql file in your MySQL client.');
+    return false;
   }
 };
 
-// Test database connection
-(async () => {
-  try {
-    const connection = await pool.getConnection();
-    console.log('Successfully connected to MySQL database');
-    connection.release();
-
-    // Initialize database if needed
-    await initializeDatabase();
-  } catch (error) {
-    console.error('Error connecting to database:', error);
-  }
-})();
-
 // Import route modules
-const authRoutes = require('./routes/auth');
-const assessmentRoutes = require('./routes/assessments');
-const courseRoutes = require('./routes/courses');
-const groupRoutes = require('./routes/groups');
+const authRoutes = require('./routes/auth')(pool, jwt, bcrypt);
+const courseRoutes = require('./routes/courses')(pool);
+const groupRoutes = require('./routes/groups')(pool);
+const assessmentRoutes = require('./routes/assessments')(pool);
+const userRoutes = require('./routes/users')(pool); // Add this line
 
 // Use routes
-app.use('/api/auth', authRoutes(pool, jwt, bcrypt));
-app.use('/api/assessments', assessmentRoutes(pool));
-app.use('/api/courses', courseRoutes(pool));
-app.use('/api/groups', groupRoutes(pool));
+app.use('/api/auth', authRoutes);
+app.use('/api/courses', courseRoutes);
+app.use('/api/groups', groupRoutes);
+app.use('/api/assessments', assessmentRoutes);
+app.use('/api/users', userRoutes); // Add this line
 
 // Root route for API health check
 app.get('/api', (req, res) => {
@@ -104,8 +79,23 @@ app.get('/api', (req, res) => {
 
 // Start server
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+
+const startServer = async () => {
+  // Check database connection first
+  const dbConnected = await testDatabaseConnection();
+
+  if (!dbConnected) {
+    console.error('Server startup aborted due to database connection issues.');
+    process.exit(1);
+  }
+
+  // Now that we know the database is connected, start the server
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+};
+
+// Start server
+startServer();
 
 module.exports = app;

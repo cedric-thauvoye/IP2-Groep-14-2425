@@ -1,230 +1,514 @@
 <template>
-    <PageLayout>
-        <h1>Students Management</h1>
-        <div class="actions">
-            <button class="add-button">
-                <i class="fas fa-plus"></i> Add Student
-            </button>
-            <button class="import-button">
-                <i class="fas fa-file-import"></i> Import Students
-            </button>
-            <button class="export-button" @click="exportStudents">
-                <i class="fas fa-file-export"></i> Export Students
-            </button>
+  <PageLayout>
+    <div class="students-container">
+      <div class="header">
+        <h1>Students</h1>
+        <div class="actions" v-if="isTeacher">
+          <router-link to="/import" class="action-button">
+            <i class="fas fa-file-import"></i> Import Students
+          </router-link>
+          <button class="action-button" @click="showAddStudentModal = true">
+            <i class="fas fa-user-plus"></i> Add Student
+          </button>
         </div>
-        <div v-if="loading" class="loading-state">
-            <i class="fas fa-spinner fa-spin"></i>
-            <p>Loading students...</p>
+      </div>
+
+      <div class="filters">
+        <div class="search-box">
+          <i class="fas fa-search"></i>
+          <input
+            type="text"
+            v-model="searchQuery"
+            placeholder="Search students..."
+            @input="filterStudents"
+          >
         </div>
-        <table class="students-table" v-else>
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Q-Number</th>
-                    <th>Groups</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr v-for="student in students" :key="student.id">
-                    <td>{{ student.first_name }} {{ student.last_name }}</td>
-                    <td>{{ student.email }}</td>
-                    <td>{{ student.q_number }}</td>
-                    <td>{{ student.groups ? student.groups.join(', ') : 'None' }}</td>
-                    <td>
-                        <button class="edit-button" @click="editStudent(student.id)">Edit</button>
-                        <button class="delete-button" @click="deleteStudent(student.id)">Delete</button>
-                    </td>
-                </tr>
-            </tbody>
+        <div class="filter-options">
+          <select v-model="courseFilter" @change="filterStudents">
+            <option value="">All Courses</option>
+            <option v-for="course in courses" :key="course.id" :value="course.id">
+              {{ course.name }}
+            </option>
+          </select>
+        </div>
+      </div>
+
+      <div v-if="loading" class="loading-state">
+        <i class="fas fa-spinner fa-spin"></i>
+        <p>Loading students...</p>
+      </div>
+
+      <div v-else>
+        <table class="students-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Q-Number</th>
+              <th>Courses</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="student in filteredStudents" :key="student.id">
+              <td>{{ student.first_name }} {{ student.last_name }}</td>
+              <td>{{ student.email }}</td>
+              <td>{{ student.q_number }}</td>
+              <td>
+                <span v-if="student.courses && student.courses.length" class="course-count">
+                  {{ student.courses.length }} course(s)
+                </span>
+                <span v-else class="no-courses">No courses</span>
+              </td>
+              <td>
+                <div class="action-buttons">
+                  <router-link :to="`/user/${student.id}`" class="view-button">
+                    <i class="fas fa-eye"></i>
+                  </router-link>
+                  <button v-if="isTeacher" class="edit-button" @click="editStudent(student.id)">
+                    <i class="fas fa-edit"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
         </table>
-    </PageLayout>
+
+        <div v-if="filteredStudents.length === 0" class="empty-state">
+          <i class="fas fa-user-graduate"></i>
+          <h3>No Students Found</h3>
+          <p>Try adjusting your search filters or import students.</p>
+        </div>
+      </div>
+
+      <!-- Edit Student Modal -->
+      <div v-if="showEditStudentModal && editingStudent" class="modal-overlay">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>Edit Student</h2>
+            <button class="close-button" @click="showEditStudentModal = false">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <div class="modal-body">
+            <form @submit.prevent="saveEditedStudent">
+              <div class="form-group">
+                <label for="first-name">First Name</label>
+                <input
+                  type="text"
+                  id="first-name"
+                  v-model="editingStudent.first_name"
+                  required
+                >
+              </div>
+              <div class="form-group">
+                <label for="last-name">Last Name</label>
+                <input
+                  type="text"
+                  id="last-name"
+                  v-model="editingStudent.last_name"
+                  required
+                >
+              </div>
+              <div class="form-group">
+                <label for="email">Email</label>
+                <input
+                  type="email"
+                  id="email"
+                  v-model="editingStudent.email"
+                  required
+                >
+              </div>
+              <div class="form-group">
+                <label for="q-number">Q-Number</label>
+                <input
+                  type="text"
+                  id="q-number"
+                  v-model="editingStudent.q_number"
+                  required
+                >
+              </div>
+              <div class="form-actions">
+                <button type="button" class="cancel-button" @click="showEditStudentModal = false">
+                  Cancel
+                </button>
+                <button type="submit" class="save-button">
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </PageLayout>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue';
-import PageLayout from '../components/Layout/PageLayout.vue';
 import { useRouter } from 'vue-router';
+import PageLayout from '../components/Layout/PageLayout.vue';
+import { userService, courseService, authService } from '../services/api';
 
 const router = useRouter();
 const students = ref([]);
+const courses = ref([]);
 const loading = ref(true);
+const isTeacher = ref(false);
+const searchQuery = ref('');
+const courseFilter = ref('');
+const filteredStudents = ref([]);
+const showAddStudentModal = ref(false);
+const showEditStudentModal = ref(false);
+const editingStudent = ref(null);
 
+// Get all students
 const fetchStudents = async () => {
-    loading.value = true;
-    try {
-        // This endpoint doesn't exist yet in our API, so we'll mock it
-        // In a real implementation, you would create a students service in the API
-        // const response = await axios.get('/api/students');
-        // students.value = response.data;
-
-        // Mock data
-        students.value = [
-            {
-                id: 1,
-                first_name: 'Alice',
-                last_name: 'Johnson',
-                email: 'alice@example.com',
-                q_number: 'q1703022',
-                groups: ['Web Development Team 1', 'Project Management Group A']
-            },
-            {
-                id: 2,
-                first_name: 'Bob',
-                last_name: 'Smith',
-                email: 'bob@example.com',
-                q_number: 'q1703023',
-                groups: ['Web Development Team 2']
-            },
-            {
-                id: 3,
-                first_name: 'Charlie',
-                last_name: 'Davis',
-                email: 'charlie@example.com',
-                q_number: 'q1703024',
-                groups: ['Database Design Group C']
-            }
-        ];
-    } catch (error) {
-        console.error('Error fetching students:', error);
-    } finally {
-        loading.value = false;
-    }
+  try {
+    const response = await userService.getStudents();
+    students.value = response.data;
+    filteredStudents.value = [...students.value];
+  } catch (error) {
+    console.error('Error fetching students:', error);
+  } finally {
+    loading.value = false;
+  }
 };
 
+// Get all courses for filter
+const fetchCourses = async () => {
+  try {
+    const response = await courseService.getCourses(isTeacher.value);
+    courses.value = response.data;
+  } catch (error) {
+    console.error('Error fetching courses:', error);
+  }
+};
+
+// Filter students based on search and course filter
+const filterStudents = () => {
+  const searchTerm = searchQuery.value.toLowerCase();
+
+  filteredStudents.value = students.value.filter(student => {
+    // Search filter
+    const matchesSearch =
+      student.first_name.toLowerCase().includes(searchTerm) ||
+      student.last_name.toLowerCase().includes(searchTerm) ||
+      student.email.toLowerCase().includes(searchTerm) ||
+      (student.q_number && student.q_number.toLowerCase().includes(searchTerm));
+
+    // Course filter
+    const matchesCourse = !courseFilter.value ||
+      (student.courses && student.courses.some(course => course.id === parseInt(courseFilter.value)));
+
+    return matchesSearch && matchesCourse;
+  });
+};
+
+// Check if user is a teacher
+const checkUserRole = async () => {
+  try {
+    const response = await authService.checkUserRole();
+    isTeacher.value = response.data.role === 'teacher' || response.data.role === 'admin';
+  } catch (error) {
+    console.error('Error checking user role:', error);
+  }
+};
+
+// Edit student function
 const editStudent = (id) => {
-    // Navigate to student edit view or show a modal
-    console.log('Edit student:', id);
+  // Find the student to edit
+  const student = students.value.find(s => s.id === id);
+  if (student) {
+    editingStudent.value = { ...student };
+    showEditStudentModal.value = true;
+  }
 };
 
-const deleteStudent = async (id) => {
-    if (confirm('Are you sure you want to delete this student?')) {
-        try {
-            // This endpoint doesn't exist yet in our API
-            // In a real implementation, you would make a delete request
-            // await axios.delete(`/api/students/${id}`);
-            students.value = students.value.filter(student => student.id !== id);
-        } catch (error) {
-            console.error('Error deleting student:', error);
-        }
+// Save edited student
+const saveEditedStudent = async () => {
+  try {
+    // Call the API to update the student
+    await userService.updateUser(editingStudent.value.id, editingStudent.value);
+
+    // Update the local list
+    const index = students.value.findIndex(s => s.id === editingStudent.value.id);
+    if (index !== -1) {
+      students.value[index] = { ...editingStudent.value };
+      filterStudents(); // Refresh filtered list
     }
+
+    // Close the modal
+    showEditStudentModal.value = false;
+    editingStudent.value = null;
+  } catch (error) {
+    console.error('Error updating student:', error);
+    alert('Failed to update student. Please try again.');
+  }
 };
 
-const exportStudents = () => {
-    // Convert students data to CSV format
-    const headers = ['Name', 'Email', 'Q-Number', 'Groups'];
-    const csvContent = [
-        headers.join(','),
-        ...students.value.map(student => [
-            `${student.first_name} ${student.last_name}`,
-            student.email,
-            student.q_number,
-            student.groups ? student.groups.join(';') : ''
-        ].join(','))
-    ].join('\n');
-
-    // Create and trigger download
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'students.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-};
-
-onMounted(() => {
-    fetchStudents();
+onMounted(async () => {
+  await checkUserRole();
+  await fetchStudents();
+  await fetchCourses();
 });
 </script>
 
 <style scoped>
-main {
-    padding: 20px;
+.students-container {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
 }
 
 .actions {
-    margin-bottom: 20px;
-    display: flex;
-    gap: 10px;
+  display: flex;
+  gap: 1rem;
 }
 
-.add-button, .import-button {
-    background-color: #3498DB;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 5px;
-    cursor: pointer;
+.action-button {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  font-size: 1rem;
+  transition: background-color 0.2s;
 }
 
-.import-button {
-    background-color: #2C3E50;
+.action-button:hover {
+  background-color: #2980b9;
+}
+
+.filters {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.search-box {
+  flex: 1;
+  position: relative;
+}
+
+.search-box i {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #7f8c8d;
+}
+
+.search-box input {
+  width: 100%;
+  padding: 0.75rem 1rem 0.75rem 2.5rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 1rem;
+}
+
+.filter-options select {
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  min-width: 200px;
+  font-size: 1rem;
 }
 
 .students-table {
-    width: 100%;
-    border-collapse: collapse;
-    background: white;
-    border-radius: 10px;
-    overflow: hidden;
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.students-table th,
-.students-table td {
-    padding: 12px;
-    text-align: left;
-    border-bottom: 1px solid #eee;
+.students-table th, .students-table td {
+  padding: 1rem;
+  text-align: left;
 }
 
 .students-table th {
-    background-color: #f5f5f5;
+  background: #f9f9f9;
+  font-weight: 600;
+  color: #2c3e50;
 }
 
-.edit-button, .delete-button {
-    padding: 5px 10px;
-    border: none;
-    border-radius: 3px;
-    cursor: pointer;
-    margin-right: 5px;
+.students-table tr:not(:last-child) td {
+  border-bottom: 1px solid #eee;
 }
 
-.edit-button {
-    background-color: #f39c12;
-    color: white;
+.course-count {
+  background: #e8f4fc;
+  color: #2980b9;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
 }
 
-.delete-button {
-    background-color: #e74c3c;
-    color: white;
+.no-courses {
+  color: #7f8c8d;
+  font-size: 0.9rem;
 }
 
-.export-button {
-    background-color: #27ae60;
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 5px;
-    cursor: pointer;
+.action-buttons {
+  display: flex;
+  gap: 0.5rem;
 }
 
-.export-button:hover {
-    background-color: #219a52;
+.view-button, .edit-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #7f8c8d;
+  padding: 0.5rem;
+  border-radius: 4px;
+  transition: all 0.2s;
 }
 
-.loading-state {
-    display: flex;
+.view-button:hover {
+  color: #3498db;
+  background: #ebf5fb;
+}
+
+.edit-button:hover {
+  color: #f39c12;
+  background: #fef9e7;
+}
+
+.loading-state, .empty-state {
+  text-align: center;
+  padding: 3rem;
+  color: #7f8c8d;
+}
+
+.loading-state i, .empty-state i {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+/* Modal styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 10px;
+  width: 500px;
+  max-width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #eee;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.form-group input, .form-group textarea, .form-group select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  box-sizing: border-box; /* Add this to include padding in width calculation */
+  max-width: 100%; /* Ensure inputs don't exceed their container */
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.cancel-button {
+  background: #f8f9fa;
+  border: 1px solid #ddd;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.save-button {
+  background: #3498db;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+@media (max-width: 992px) {
+  .students-table {
+    display: block;
+    overflow-x: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .header {
     flex-direction: column;
-    align-items: center;
-    padding: 50px;
-    gap: 20px;
-}
+    align-items: flex-start;
+    gap: 1rem;
+  }
 
-.loading-state i {
-    font-size: 2rem;
-    color: #3498DB;
+  .filters {
+    flex-direction: column;
+  }
+
+  .search-box, .filter-options select {
+    width: 100%;
+  }
 }
 </style>

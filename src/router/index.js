@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { authService } from '../services/api'
 
 // View imports
 import LoginView from '../views/LoginView.vue'
@@ -41,24 +42,24 @@ const router = createRouter({
       component: CoursesView,
       beforeEnter: requireAuth
     },
-    // {
-    //   path: '/course/:id',
-    //   name: 'course-detail',
-    //   component: () => import('../views/CourseDetailView.vue'),
-    //   beforeEnter: requireAuth
-    // },
+    {
+      path: '/course/:id',
+      name: 'course-detail',
+      component: () => import('../views/CourseDetailView.vue'),
+      beforeEnter: requireAuth
+    },
     {
       path: '/groups',
       name: 'groups',
       component: GroupsView,
       beforeEnter: requireAuth
     },
-    // {
-    //   path: '/group/:id',
-    //   name: 'group-detail',
-    //   component: () => import('../views/GroupDetailView.vue'),
-    //   beforeEnter: requireAuth
-    // },
+    {
+      path: '/group/:id',
+      name: 'group-detail',
+      component: () => import('../views/GroupDetailView.vue'),
+      beforeEnter: requireAuth
+    },
     {
       path: '/students',
       name: 'students',
@@ -77,18 +78,6 @@ const router = createRouter({
       component: AssessmentsView,
       beforeEnter: requireAuth
     },
-    // {
-    //   path: '/assessment/:id',
-    //   name: 'assessment-detail',
-    //   component: () => import('../views/AssessmentDetailView.vue'),
-    //   beforeEnter: requireAuth
-    // },
-    // {
-    //   path: '/assessment/:id/results',
-    //   name: 'assessment-results',
-    //   component: () => import('../views/AssessmentResultsView.vue'),
-    //   beforeEnter: requireAuth
-    // },
     {
       path: '/results',
       name: 'results',
@@ -96,32 +85,39 @@ const router = createRouter({
       beforeEnter: requireAuth
     },
     {
+      path: '/logout',
+      name: 'logout',
+      beforeEnter: async (to, from, next) => {
+        // Just clear local tokens without Microsoft logout
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user_data');
+        // Redirect to login with logout parameter
+        next({ name: 'login', query: { logout: 'true' } });
+      }
+    },
+    // Admin routes
+    {
       path: '/admin',
-      name: 'admin',
-      component: () => import('../views/AdminView.vue'),
+      name: 'admin-dashboard',
+      component: () => import('../views/AdminDashboardView.vue'),
       beforeEnter: async (to, from, next) => {
         const token = localStorage.getItem('auth_token');
         if (!token) {
+          console.log('Admin route: No token found, redirecting to login');
           next({ name: 'login' });
           return;
         }
 
         try {
-          // Check if user is admin
-          const response = await fetch('/api/auth/role', {
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          });
+          console.log('Admin route: Checking user role');
+          const response = await authService.checkUserRole();
+          console.log('Admin route: User role check response:', response.data);
 
-          if (!response.ok) {
-            throw new Error('Failed to check user role');
-          }
-
-          const data = await response.json();
-          if (data.role === 'admin') {
+          if (response.data && response.data.role === 'admin') {
+            console.log('Admin route: User is admin, allowing access');
             next();
           } else {
+            console.log('Admin route: User is not admin, redirecting to home');
             next({ name: 'home' });
           }
         } catch (error) {
@@ -131,16 +127,10 @@ const router = createRouter({
       }
     },
     {
-      path: '/logout',
-      name: 'logout',
-      beforeEnter: async (to, from, next) => {
-        // Just clear local tokens without Microsoft logout
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('user_data');
-
-        // Redirect to login with logout parameter
-        next({ name: 'login', query: { logout: 'true' } });
-      }
+      path: '/user/:id',
+      name: 'user-detail',
+      component: () => import('../views/UserDetailView.vue'),
+      beforeEnter: requireAuth
     }
   ]
 })

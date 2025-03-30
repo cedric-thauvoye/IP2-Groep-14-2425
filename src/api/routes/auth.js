@@ -284,8 +284,15 @@ module.exports = (pool, jwt, bcrypt) => {
   });
 
   // Get user role
-  router.get('/role', authenticateToken, (req, res) => {
-    res.json({ role: req.user.role });
+  router.get('/role', authenticateToken, async (req, res) => {
+    try {
+      // Return the user's role from the decoded token
+      console.log('Role check for user:', req.user);
+      res.json({ role: req.user.role });
+    } catch (error) {
+      console.error('Error checking role:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
   });
 
   // Logout route (client-side logout, just for API completeness)
@@ -293,6 +300,39 @@ module.exports = (pool, jwt, bcrypt) => {
     // No server-side action needed as we're using JWTs
     // Client should remove the token from localStorage
     res.json({ message: 'Logged out successfully' });
+  });
+
+  // Add this endpoint for password verification
+  router.post('/verify-password', authenticateToken, async (req, res) => {
+    try {
+      const { password } = req.body;
+
+      if (!password) {
+        return res.status(400).json({ message: 'Password is required' });
+      }
+
+      const conn = await pool.getConnection();
+
+      // Get user from database
+      const [rows] = await conn.execute(
+        'SELECT password FROM users WHERE id = ?',
+        [req.user.id]
+      );
+
+      conn.release();
+
+      if (rows.length === 0) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      // Verify password
+      const passwordValid = await bcrypt.compare(password, rows[0].password);
+
+      res.json({ valid: passwordValid });
+    } catch (error) {
+      console.error('Error verifying password:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
   });
 
   return router;
