@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv');
+const bodyParser = require('body-parser');
 
 // Load environment variables from .env file
 const result = dotenv.config();
@@ -30,22 +31,51 @@ if (missingEnvVars.length > 0) {
 
 const app = express();
 
-// Configure CORS with specific allowed origins
+// Configure CORS with expanded allowed origins
 const corsOptions = {
   origin: [
+    // Local development origins
     'http://localhost:5173',
     'http://localhost:8080',
     'http://localhost',
-    'https://ip2-app.thauvoye.net'  // Added the requested domain
+
+    // Production origins
+    'https://ip2-app.thauvoye.net',
+    'https://ip2-api.thauvoye.net',
+
+    // Add the origin as a wildcard subdomain
+    /^https:\/\/[\w-]+\.thauvoye\.net$/
   ],
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  methods: 'GET, HEAD, PUT, PATCH, POST, DELETE, OPTIONS',
+  allowedHeaders: ['Content-Type', 'Authorization', 'Origin', 'Accept', 'X-Requested-With'],
   credentials: true,
-  optionsSuccessStatus: 204
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
+  maxAge: 86400 // 24 hours
 };
 
 // Apply CORS middleware with options
 app.use(cors(corsOptions));
-app.use(express.json());
+
+// Add CORS headers to responses if the preflight doesn't handle it
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin);
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, HEAD, PUT, PATCH, POST, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Origin, Accept, X-Requested-With');
+
+  // Handle OPTIONS preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+  next();
+});
+
+// Parse JSON request body
+app.use(bodyParser.json());
+
+// Parse URL-encoded form data
+app.use(bodyParser.urlencoded({ extended: true }));
 
 // Create a database connection pool
 const pool = mysql.createPool({
@@ -92,6 +122,12 @@ app.get('/health', (req, res) => {
   res.json({ message: 'Assessment API is running' });
 });
 
+// Error handler middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ message: 'Something went wrong!' });
+});
+
 // Start server
 const PORT = process.env.PORT || 3000;
 
@@ -107,6 +143,7 @@ const startServer = async () => {
   // Now that we know the database is connected, start the server
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+    console.log(`CORS enabled for origins:`, corsOptions.origin);
   });
 };
 
