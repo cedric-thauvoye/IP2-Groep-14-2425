@@ -194,10 +194,28 @@ onMounted(async () => {
     box-sizing: border-box;
     transform: translateX(-100%);
     transition: transform 0.3s ease;
+    overflow-y: auto; /* Enable vertical scrolling */
+    overflow-x: hidden; /* Hide horizontal scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: #3498db #2C3E50;
 }
 
 .navBar.show {
     transform: translateX(0);
+}
+
+.navBar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.navBar::-webkit-scrollbar-track {
+    background: #2C3E50;
+}
+
+.navBar::-webkit-scrollbar-thumb {
+    background-color: #3498db;
+    border-radius: 6px;
+    border: 2px solid #2C3E50;
 }
 
 .toggle-button,
