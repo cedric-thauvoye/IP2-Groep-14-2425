@@ -4,10 +4,10 @@ const axios = require('axios');
 module.exports = (pool, jwt, bcrypt) => {
   const router = express.Router();
 
-  // Check if JWT_SECRET is set
-  const JWT_SECRET = process.env.JWT_SECRET;
-  if (!JWT_SECRET) {
-    console.error('WARNING: JWT_SECRET is not set. Authentication will fail.');
+  // Check if VITE_JWT_SECRET is set
+  const VITE_JWT_SECRET = process.env.VITE_JWT_SECRET;
+  if (!VITE_JWT_SECRET) {
+    console.error('WARNING: VITE_JWT_SECRET is not set. Authentication will fail.');
   }
 
   // Middleware to verify JWT token
@@ -17,13 +17,13 @@ module.exports = (pool, jwt, bcrypt) => {
 
     if (!token) return res.status(401).json({ message: 'Unauthorized: No token provided' });
 
-    // Verify JWT_SECRET is set
-    if (!JWT_SECRET) {
-      return res.status(500).json({ message: 'Server configuration error: JWT_SECRET is not set' });
+    // Verify VITE_JWT_SECRET is set
+    if (!VITE_JWT_SECRET) {
+      return res.status(500).json({ message: 'Server configuration error: VITE_JWT_SECRET is not set' });
     }
 
     try {
-      const user = jwt.verify(token, JWT_SECRET);
+      const user = jwt.verify(token, VITE_JWT_SECRET);
       req.user = user;
       next();
     } catch (error) {
@@ -34,9 +34,9 @@ module.exports = (pool, jwt, bcrypt) => {
   // Login route
   router.post('/login', async (req, res) => {
     try {
-      // Verify JWT_SECRET is set
-      if (!JWT_SECRET) {
-        return res.status(500).json({ message: 'Server configuration error: JWT_SECRET is not set' });
+      // Verify VITE_JWT_SECRET is set
+      if (!VITE_JWT_SECRET) {
+        return res.status(500).json({ message: 'Server configuration error: VITE_JWT_SECRET is not set' });
       }
 
       const { email, password } = req.body;
@@ -58,7 +58,7 @@ module.exports = (pool, jwt, bcrypt) => {
 
       const token = jwt.sign(
         { id: user.id, email: user.email, role: user.role },
-        JWT_SECRET,
+        VITE_JWT_SECRET,
         { expiresIn: '24h' }
       );
 
@@ -81,9 +81,9 @@ module.exports = (pool, jwt, bcrypt) => {
   // Register route
   router.post('/register', async (req, res) => {
     try {
-      // Verify JWT_SECRET is set
-      if (!JWT_SECRET) {
-        return res.status(500).json({ message: 'Server configuration error: JWT_SECRET is not set' });
+      // Verify VITE_JWT_SECRET is set
+      if (!VITE_JWT_SECRET) {
+        return res.status(500).json({ message: 'Server configuration error: VITE_JWT_SECRET is not set' });
       }
 
       const { email, password, firstName, lastName, role = 'student' } = req.body;
@@ -117,7 +117,7 @@ module.exports = (pool, jwt, bcrypt) => {
 
       const token = jwt.sign(
         { id: result.insertId, email, role },
-        JWT_SECRET,
+        VITE_JWT_SECRET,
         { expiresIn: '24h' }
       );
 
@@ -135,9 +135,9 @@ module.exports = (pool, jwt, bcrypt) => {
   // Microsoft authentication route
   router.post('/microsoft', async (req, res) => {
     try {
-      // Verify JWT_SECRET is set
-      if (!JWT_SECRET) {
-        return res.status(500).json({ message: 'Server configuration error: JWT_SECRET is not set' });
+      // Verify VITE_JWT_SECRET is set
+      if (!VITE_JWT_SECRET) {
+        return res.status(500).json({ message: 'Server configuration error: VITE_JWT_SECRET is not set' });
       }
 
       const { token: msalToken } = req.body; // Rename to msalToken to avoid conflict
@@ -218,7 +218,7 @@ module.exports = (pool, jwt, bcrypt) => {
       // Generate JWT token
       const jwtToken = jwt.sign(
         { id: user.id, email: user.email, role: user.role },
-        JWT_SECRET,
+        VITE_JWT_SECRET,
         { expiresIn: '24h' }
       );
 

@@ -14,17 +14,17 @@ if (result.error) {
 }
 
 // Verify required env variables are set
-const requiredEnvVars = ['MYSQL_HOST', 'MYSQL_USER', 'MYSQL_PASSWORD', 'MYSQL_DATABASE', 'JWT_SECRET'];
+const requiredEnvVars = ['VITE_MYSQL_HOST', 'VITE_MYSQL_USER', 'VITE_MYSQL_PASSWORD', 'VITE_MYSQL_DATABASE', 'VITE_JWT_SECRET'];
 const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
 if (missingEnvVars.length > 0) {
   console.error(`Missing required environment variables: ${missingEnvVars.join(', ')}`);
   console.error('Please set these variables in your .env file or environment.');
 
-  // Set default JWT_SECRET for development (not recommended for production)
-  if (missingEnvVars.includes('JWT_SECRET') && process.env.NODE_ENV !== 'production') {
-    console.warn('Setting a default JWT_SECRET for development. DO NOT use in production!');
-    process.env.JWT_SECRET = 'default-development-secret-do-not-use-in-production';
+  // Set default VITE_JWT_SECRET for development (not recommended for production)
+  if (missingEnvVars.includes('VITE_JWT_SECRET') && process.env.NODE_ENV !== 'production') {
+    console.warn('Setting a default VITE_JWT_SECRET for development. DO NOT use in production!');
+    process.env.VITE_JWT_SECRET = 'default-development-secret-do-not-use-in-production';
   }
 }
 
@@ -34,10 +34,10 @@ app.use(express.json());
 
 // Create a database connection pool
 const pool = mysql.createPool({
-  host: process.env.MYSQL_HOST,
-  user: process.env.MYSQL_USER,
-  password: process.env.MYSQL_PASSWORD,
-  database: process.env.MYSQL_DATABASE,
+  host: process.env.VITE_MYSQL_HOST,
+  user: process.env.VITE_MYSQL_USER,
+  password: process.env.VITE_MYSQL_PASSWORD,
+  database: process.env.VITE_MYSQL_DATABASE,
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0

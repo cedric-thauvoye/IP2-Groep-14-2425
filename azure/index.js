@@ -11,10 +11,10 @@ app.use(express.json());
 
 // MySQL Connection Pool
 const pool = mysql.createPool({
-  host: process.env.MYSQL_HOST,
-  user: process.env.MYSQL_USER,
-  password: process.env.MYSQL_PASSWORD,
-  database: process.env.MYSQL_DATABASE,
+  host: process.env.VITE_MYSQL_HOST,
+  user: process.env.VITE_MYSQL_USER,
+  password: process.env.VITE_MYSQL_PASSWORD,
+  database: process.env.VITE_MYSQL_DATABASE,
   ssl: {
     rejectUnauthorized: true
   }
@@ -28,7 +28,7 @@ const authenticateToken = async (req, res, next) => {
   if (!token) return res.status(401).json({ message: 'Unauthorized: No token provided' });
 
   try {
-    const user = jwt.verify(token, process.env.JWT_SECRET);
+    const user = jwt.verify(token, process.env.VITE_JWT_SECRET);
     req.user = user;
     next();
   } catch (error) {
@@ -37,7 +37,7 @@ const authenticateToken = async (req, res, next) => {
 };
 
 // Auth Routes
-app.post('/api/auth/login', async (req, res) => {
+app.post('/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     const conn = await pool.getConnection();
@@ -58,7 +58,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET,
+      process.env.VITE_JWT_SECRET,
       { expiresIn: '24h' }
     );
 
@@ -70,16 +70,16 @@ app.post('/api/auth/login', async (req, res) => {
 });
 
 // User Routes
-app.get('/api/auth/me', authenticateToken, (req, res) => {
+app.get('/auth/me', authenticateToken, (req, res) => {
   res.json({ user: req.user });
 });
 
-app.get('/api/auth/role', authenticateToken, (req, res) => {
+app.get('/auth/role', authenticateToken, (req, res) => {
   res.json({ role: req.user.role });
 });
 
 // Assessment Routes
-app.get('/api/assessments/pending', authenticateToken, async (req, res) => {
+app.get('/assessments/pending', authenticateToken, async (req, res) => {
   try {
     const conn = await pool.getConnection();
     const [rows] = await conn.execute(
@@ -108,7 +108,7 @@ app.get('/api/assessments/pending', authenticateToken, async (req, res) => {
   }
 });
 
-app.get('/api/assessments/completed', authenticateToken, async (req, res) => {
+app.get('/assessments/completed', authenticateToken, async (req, res) => {
   try {
     const conn = await pool.getConnection();
     const [rows] = await conn.execute(

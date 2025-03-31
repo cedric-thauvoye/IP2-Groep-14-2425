@@ -26,9 +26,9 @@ import { PublicClientApplication, BrowserAuthError } from '@azure/msal-browser';
 })();
 
 // Read values from import.meta.env with fallbacks
-const clientId = import.meta.env.AZURE_CLIENT_ID;
-const tenantId = import.meta.env.AZURE_TENANT_ID;
-const redirectUri = import.meta.env.AZURE_REDIRECT_URI;
+const clientId = import.meta.env.VITE_AZURE_CLIENT_ID;
+const tenantId = import.meta.env.VITE_AZURE_TENANT_ID;
+const redirectUri = import.meta.env.VITE_AZURE_REDIRECT_URI;
 
 // A safer function to create the MSAL instance that won't throw exceptions
 const createMsalInstance = () => {
