@@ -29,7 +29,22 @@ if (missingEnvVars.length > 0) {
 }
 
 const app = express();
-app.use(cors());
+
+// Configure CORS with specific allowed origins
+const corsOptions = {
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:8080',
+    'http://localhost',
+    'https://ip2-app.thauvoye.net'  // Added the requested domain
+  ],
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  credentials: true,
+  optionsSuccessStatus: 204
+};
+
+// Apply CORS middleware with options
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Create a database connection pool
