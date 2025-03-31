@@ -66,14 +66,14 @@ const assessmentRoutes = require('./routes/assessments')(pool);
 const userRoutes = require('./routes/users')(pool); // Add this line
 
 // Use routes
-app.use('/api/auth', authRoutes);
-app.use('/api/courses', courseRoutes);
-app.use('/api/groups', groupRoutes);
-app.use('/api/assessments', assessmentRoutes);
-app.use('/api/users', userRoutes); // Add this line
+app.use('/auth', authRoutes);
+app.use('/courses', courseRoutes);
+app.use('/groups', groupRoutes);
+app.use('/assessments', assessmentRoutes);
+app.use('/users', userRoutes); // Add this line
 
 // Root route for API health check
-app.get('/api', (req, res) => {
+app.get('/health', (req, res) => {
   res.json({ message: 'Assessment API is running' });
 });
 

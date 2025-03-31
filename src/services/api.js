@@ -1,9 +1,9 @@
 import axios from 'axios';
 
-// Use environment variable with fallback
-const API_URL = import.meta.env.API_URL || 'http://localhost:3000/api';
+// Get the API URL from environment variables with fallback
+const API_URL = import.meta.env.API_URL || 'http://localhost:3000';
 
-// Create axios instance with default config
+// Don't append '/api' - use the API_URL directly as provided
 const apiClient = axios.create({
   baseURL: API_URL,
   headers: {
