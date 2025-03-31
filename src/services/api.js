@@ -1,7 +1,8 @@
 import axios from 'axios';
+import { config } from '../config';
 
-// Get the API URL from environment variables with fallback
-const VITE_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// Get the API URL from config with fallback
+const VITE_API_URL = config.api.url || 'http://localhost:3000';
 
 // Don't append '/api' - use the VITE_API_URL directly as provided
 const apiClient = axios.create({

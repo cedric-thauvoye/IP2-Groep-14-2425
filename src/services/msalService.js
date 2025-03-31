@@ -1,4 +1,5 @@
 import { PublicClientApplication, BrowserAuthError } from '@azure/msal-browser';
+import { config } from '../config';
 
 // IMMEDIATELY check for crypto availability before any other code runs
 (function ensureCryptoAvailableImmediately() {
@@ -25,10 +26,32 @@ import { PublicClientApplication, BrowserAuthError } from '@azure/msal-browser';
   }
 })();
 
-// Read values from import.meta.env with fallbacks
-const clientId = import.meta.env.VITE_AZURE_CLIENT_ID;
-const tenantId = import.meta.env.VITE_AZURE_TENANT_ID;
-const redirectUri = import.meta.env.VITE_AZURE_REDIRECT_URI;
+// Read values from config with fallbacks
+const clientId = config.azure.clientId;
+const tenantId = config.azure.tenantId;
+// Ensure redirectUri uses window.location.origin if available
+const redirectUri = (() => {
+  // Use the config value as a base
+  let uri = config.azure.redirectUri;
+
+  try {
+    // If we're in a browser, use the current origin if necessary
+    if (typeof window !== 'undefined') {
+      // If the configured URI doesn't match the current origin, use window.location.origin
+      const currentOrigin = window.location.origin;
+      if (!uri.startsWith(currentOrigin) && !uri.includes('localhost')) {
+        console.log(`Adjusting redirect URI from ${uri} to ${currentOrigin}`);
+        return currentOrigin;
+      }
+    }
+  } catch (e) {
+    console.warn('Error checking window.location:', e);
+  }
+
+  return uri;
+})();
+
+console.log('MSAL Configuration:', { clientId, tenantId, redirectUri });
 
 // A safer function to create the MSAL instance that won't throw exceptions
 const createMsalInstance = () => {
@@ -39,13 +62,15 @@ const createMsalInstance = () => {
         clientId: clientId,
         authority: `https://login.microsoftonline.com/${tenantId}`,
         redirectUri: redirectUri,
-        navigateToLoginRequestUrl: false,
+        navigateToLoginRequestUrl: true,
+        postLogoutRedirectUri: redirectUri,
       },
       cache: {
         cacheLocation: 'sessionStorage',
         storeAuthStateInCookie: true,
       },
       system: {
+        allowRedirectInIframe: true,
         allowNativeBroker: false, // Disable native broker which might cause crypto errors
         loggerOptions: {
           logLevel: 2, // Warning level
@@ -71,8 +96,10 @@ const createMsalInstance = () => {
       getAllAccounts: () => [],
       loginRedirect: () => {
         console.log("Using fallback loginRedirect");
-        // Use a simple redirect as fallback
-        window.location.href = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?client_id=${clientId}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=openid%20profile%20User.Read`;
+        // Use a simple redirect to Microsoft login page
+        const url = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?client_id=${clientId}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=openid%20profile%20User.Read`;
+        console.log("Redirecting to:", url);
+        window.location.href = url;
         return Promise.resolve();
       },
       acquireTokenSilent: () => Promise.reject(new Error('MSAL is not available')),
@@ -111,7 +138,9 @@ const ensureInitialized = async () => {
 
 // Login request with broader scopes
 const loginRequest = {
-  scopes: ["openid", "profile", "User.Read"]
+  scopes: ["openid", "profile", "User.Read"],
+  prompt: "select_account", // Force account selection each time
+  redirectStartPage: redirectUri
 };
 
 // Simple redirect login with error handling
@@ -119,6 +148,11 @@ const loginWithRedirect = async () => {
   try {
     // Ensure MSAL is initialized before calling loginRedirect
     await ensureInitialized();
+
+    // Clear any existing auth state to prevent conflicts
+    sessionStorage.removeItem('msal.interaction.status');
+
+    console.log("Starting login redirect with request:", loginRequest);
 
     if (msalInstance.loginRedirect) {
       await msalInstance.loginRedirect(loginRequest);
@@ -129,8 +163,8 @@ const loginWithRedirect = async () => {
     }
   } catch (error) {
     console.error("Error during login redirect:", error);
-    // Show a user-friendly message and provide an alternative
-    alert("There was a problem with Microsoft login. Please try again or contact support.");
+    // Try direct window location as last resort
+    window.location.href = `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?client_id=${clientId}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=openid%20profile%20User.Read`;
   }
 };
 
@@ -139,8 +173,12 @@ const handleRedirectPromise = async () => {
   try {
     // Ensure MSAL is initialized before calling handleRedirectPromise
     await ensureInitialized();
+    console.log("Handling redirect promise");
+
     const response = msalInstance.handleRedirectPromise ?
       await msalInstance.handleRedirectPromise() : null;
+
+    console.log("Redirect response:", response);
     return response?.accessToken || null;
   } catch (error) {
     console.error("Error handling redirect:", error);
@@ -155,6 +193,7 @@ const getAccount = async () => {
     await ensureInitialized();
     const accounts = msalInstance.getAllAccounts ?
       msalInstance.getAllAccounts() : [];
+    console.log("Available accounts:", accounts);
     return accounts.length > 0 ? accounts[0] : null;
   } catch (error) {
     console.error("Error getting account:", error);
@@ -169,17 +208,24 @@ const acquireToken = async () => {
     await ensureInitialized();
 
     const account = await getAccount();
-    if (!account) return null;
+    if (!account) {
+      console.log("No account found, need to login");
+      return null;
+    }
 
     try {
       if (!msalInstance.acquireTokenSilent) {
         throw new Error('acquireTokenSilent not available');
       }
 
+      console.log("Acquiring token silently for account:", account.username);
       const response = await msalInstance.acquireTokenSilent({
         scopes: loginRequest.scopes,
-        account: account
+        account: account,
+        forceRefresh: false
       });
+
+      console.log("Token acquired successfully");
       return response.accessToken;
     } catch (error) {
       console.warn("Silent token acquisition failed:", error);
@@ -190,8 +236,11 @@ const acquireToken = async () => {
           error.message.includes('crypto')) {
 
         try {
+          console.log("Falling back to interactive token acquisition");
+          // Clear any existing interaction state
+          sessionStorage.removeItem('msal.interaction.status');
+
           if (msalInstance.acquireTokenRedirect) {
-            console.log("Falling back to interactive token acquisition");
             await msalInstance.acquireTokenRedirect({
               scopes: loginRequest.scopes,
               account: account

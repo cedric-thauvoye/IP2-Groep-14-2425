@@ -19,5 +19,8 @@ export default defineConfig({
   },
   server: {
     allowedHosts: ['ip2-app.thauvoye.net'],
+  },
+  define: {
+    'process.env': {}
   }
 })
