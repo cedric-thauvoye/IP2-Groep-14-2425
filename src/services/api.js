@@ -2,11 +2,11 @@ import axios from 'axios';
 import { config } from '../config';
 
 // Get the API URL from config with fallback
-const VITE_API_URL = config.api.url || 'http://localhost:3000';
+const API_URL = config.api.url || 'http://localhost:3000';
 
-// Don't append '/api' - use the VITE_API_URL directly as provided
+// Don't append '/api' - use the API_URL directly as provided
 const apiClient = axios.create({
-  baseURL: VITE_API_URL,
+  baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
   },

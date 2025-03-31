@@ -11,10 +11,10 @@ app.use(express.json());
 
 // MySQL Connection Pool
 const pool = mysql.createPool({
-  host: process.env.VITE_MYSQL_HOST,
-  user: process.env.VITE_MYSQL_USER,
-  password: process.env.VITE_MYSQL_PASSWORD,
-  database: process.env.VITE_MYSQL_DATABASE,
+  host: process.env.MYSQL_HOST,
+  user: process.env.MYSQL_USER,
+  password: process.env.MYSQL_PASSWORD,
+  database: process.env.MYSQL_DATABASE,
   ssl: {
     rejectUnauthorized: true
   }
@@ -28,7 +28,7 @@ const authenticateToken = async (req, res, next) => {
   if (!token) return res.status(401).json({ message: 'Unauthorized: No token provided' });
 
   try {
-    const user = jwt.verify(token, process.env.VITE_JWT_SECRET);
+    const user = jwt.verify(token, process.env.JWT_SECRET);
     req.user = user;
     next();
   } catch (error) {
@@ -58,7 +58,7 @@ app.post('/auth/login', async (req, res) => {
 
     const token = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
-      process.env.VITE_JWT_SECRET,
+      process.env.JWT_SECRET,
       { expiresIn: '24h' }
     );
 

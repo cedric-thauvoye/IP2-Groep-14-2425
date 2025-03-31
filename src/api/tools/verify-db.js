@@ -23,10 +23,10 @@ const verifyDatabase = async () => {
   let connection;
   try {
     connection = await mysql.createConnection({
-      host: process.env.VITE_MYSQL_HOST || 'localhost',
-      user: process.env.VITE_MYSQL_USER || 'root',
-      password: process.env.VITE_MYSQL_PASSWORD || '',
-      database: process.env.VITE_MYSQL_DATABASE || 'peer_evaluation',
+      host: process.env.MYSQL_HOST || 'localhost',
+      user: process.env.MYSQL_USER || 'root',
+      password: process.env.MYSQL_PASSWORD || '',
+      database: process.env.MYSQL_DATABASE || 'peer_evaluation',
     });
 
     console.log('✅ Connected to database successfully');
