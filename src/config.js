@@ -7,7 +7,7 @@
 const config = {
   // API Configuration
   api: {
-    url: 'http://localhost:3000', // Base API URL (without trailing slash)
+    url: 'https://ip2-api.thauvoye.net', // Base API URL (without trailing slash)
   },
 
   // Azure AD Configuration
