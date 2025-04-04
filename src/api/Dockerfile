@@ -2,6 +2,9 @@ FROM node:18-alpine
 
 WORKDIR /app
 
+# Install basic utilities
+RUN apk add --no-cache bash
+
 # Copy package files
 COPY package*.json ./
 RUN npm install
@@ -12,5 +15,5 @@ COPY . .
 # Expose API port
 EXPOSE 3000
 
-# Start API server in development mode for hot reloading
-CMD ["npm", "run", "dev"]
+# Add a startup script that waits for the database to be ready
+CMD ["sh", "-c", "echo 'Waiting for database to initialize...' && sleep 10 && npm run dev"]
