@@ -240,13 +240,16 @@ onMounted(async () => {
 
 .filters {
   display: flex;
-  gap: 1rem;
+  gap: .5rem; /* Significantly increased gap between search and filter */
   margin-bottom: 2rem;
+  align-items: stretch; /* Ensure all elements stretch to the same height */
 }
 
 .search-box {
   flex: 1;
   position: relative;
+  display: flex;
+  align-items: center;
 }
 
 .search-box i {
@@ -263,6 +266,8 @@ onMounted(async () => {
   border: 1px solid #ddd;
   border-radius: 8px;
   font-size: 1rem;
+  height: 46px; /* Exact height specification */
+  box-sizing: border-box;
 }
 
 .filter-options select {
@@ -270,6 +275,9 @@ onMounted(async () => {
   border: 1px solid #ddd;
   border-radius: 8px;
   font-size: 1rem;
+  min-width: 200px;
+  height: 46px; /* Exact same height as search input */
+  box-sizing: border-box;
 }
 
 .courses-grid {

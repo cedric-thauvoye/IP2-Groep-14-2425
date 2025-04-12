@@ -13,13 +13,34 @@
         </div>
       </div>
 
+      <!-- Added search and filter features -->
+      <div class="filters">
+        <div class="search-box">
+          <i class="fas fa-search"></i>
+          <input
+            type="text"
+            v-model="searchQuery"
+            placeholder="Search groups..."
+            @input="filterGroups"
+          >
+        </div>
+        <div class="filter-options">
+          <select v-model="courseFilter" @change="filterGroups">
+            <option value="">All Courses</option>
+            <option v-for="course in courses" :key="course.id" :value="course.id">
+              {{ course.name }}
+            </option>
+          </select>
+        </div>
+      </div>
+
       <div v-if="loading" class="loading-state">
         <i class="fas fa-spinner fa-spin"></i>
         <p>Loading groups...</p>
       </div>
 
-      <div v-else-if="groups.length > 0" class="groups-grid">
-        <div v-for="group in groups" :key="group.id" class="group-card">
+      <div v-else-if="filteredGroups.length > 0" class="groups-grid">
+        <div v-for="group in filteredGroups" :key="group.id" class="group-card">
           <div class="group-header">
             <h3>{{ group.name }}</h3>
             <span class="member-count">
@@ -97,18 +118,43 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
-import { groupService, authService } from '../services/api';
+import { groupService, authService, courseService } from '../services/api';
 
 const router = useRouter();
 const groups = ref([]);
+const courses = ref([]);
 const loading = ref(true);
 const isTeacher = ref(false);
 const showCreateGroupModal = ref(false);
 const showEditGroupModal = ref(false);
 const editingGroup = ref(null);
+const searchQuery = ref('');
+const courseFilter = ref('');
+
+// New computed property to filter groups based on search and course filter
+const filteredGroups = computed(() => {
+  return groups.value.filter(group => {
+    const matchesSearch =
+      !searchQuery.value ||
+      group.name.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+      (group.course_name && group.course_name.toLowerCase().includes(searchQuery.value.toLowerCase()));
+
+    const matchesCourse =
+      !courseFilter.value ||
+      group.course_id === parseInt(courseFilter.value);
+
+    return matchesSearch && matchesCourse;
+  });
+});
+
+// New method to handle filtering
+const filterGroups = () => {
+  // The computed property will update automatically
+  console.log('Filtering groups with:', searchQuery.value, courseFilter.value);
+};
 
 const editGroup = (group) => {
   editingGroup.value = { ...group };
@@ -150,6 +196,10 @@ onMounted(async () => {
     // Fetch groups
     const response = await groupService.getGroups();
     groups.value = response.data;
+
+    // Fetch courses for filter dropdown
+    const coursesResponse = await courseService.getCourses();
+    courses.value = coursesResponse.data;
   } catch (error) {
     console.error('Error fetching groups:', error);
   } finally {
@@ -174,6 +224,49 @@ onMounted(async () => {
 .header h1 {
   margin: 0;
   color: #2c3e50;
+}
+
+/* Updated filters styling with proper spacing and alignment */
+.filters {
+  display: flex;
+  gap: .5rem; /* Significantly increased gap between search and filter */
+  margin-bottom: 2rem;
+  align-items: stretch; /* Ensure all elements stretch to the same height */
+}
+
+.search-box {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-box i {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #7f8c8d;
+}
+
+.search-box input {
+  width: 100%;
+  padding: 0.75rem 1rem 0.75rem 2.5rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 1rem;
+  height: 46px; /* Exact height specification */
+  box-sizing: border-box;
+}
+
+.filter-options select {
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 1rem;
+  min-width: 200px;
+  height: 46px; /* Exact same height as search input */
+  box-sizing: border-box;
 }
 
 .actions {
@@ -389,6 +482,15 @@ onMounted(async () => {
     flex-direction: column;
     align-items: flex-start;
     gap: 1rem;
+  }
+
+  .filters {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .search-box, .filter-options select {
+    width: 100%;
   }
 
   .groups-grid {
