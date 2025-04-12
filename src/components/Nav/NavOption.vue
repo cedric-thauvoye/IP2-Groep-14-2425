@@ -30,7 +30,7 @@ const props = defineProps({
 }
 
 .nav-option:hover {
-    background-color: #F1F1F1;
+    background-color: #f5f7fa;
     cursor: pointer;
 }
 
@@ -38,5 +38,9 @@ const props = defineProps({
     text-decoration: none;
     color: #333;
     font-weight: bold;
+}
+
+.nav-option:hover .nav-link {
+    color: #555 !important;
 }
 </style>
