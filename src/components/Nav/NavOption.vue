@@ -1,9 +1,7 @@
 <template>
-    <div class="nav-option">
-        <router-link :to="to" class="nav-link" :style="{ color }">
-            <slot></slot>
-        </router-link>
-    </div>
+    <router-link :to="to" class="nav-option" :style="{ color }">
+        <slot></slot>
+    </router-link>
 </template>
 
 <script setup>
@@ -23,24 +21,19 @@ const props = defineProps({
 
 <style scoped>
 .nav-option {
+    display: block;
     margin: 10px 0 0 0;
     padding: 10px 20px;
     border-radius: 5px;
     transition: background-color 0.3s ease;
+    text-decoration: none;
+    color: inherit;
+    font-weight: bold;
 }
 
 .nav-option:hover {
     background-color: #f5f7fa;
     cursor: pointer;
-}
-
-.nav-link {
-    text-decoration: none;
-    color: #333;
-    font-weight: bold;
-}
-
-.nav-option:hover .nav-link {
     color: #555 !important;
 }
 </style>
