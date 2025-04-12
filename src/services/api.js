@@ -68,6 +68,7 @@ export const courseService = {
   addStudentToCourse: (courseId, studentId) => apiClient.post(`/courses/${courseId}/students`, { studentId }),
   removeStudentFromCourse: (courseId, studentId) => apiClient.delete(`/courses/${courseId}/students/${studentId}`),
   addTeacherToCourse: (courseId, teacherId) => apiClient.post(`/courses/${courseId}/teachers`, { teacherId }),
+  getUserCourses: (userId) => apiClient.get(`/users/${userId}/courses`),
 };
 
 // Group services

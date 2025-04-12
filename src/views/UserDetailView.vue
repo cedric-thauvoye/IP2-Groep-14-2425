@@ -95,14 +95,6 @@
                 <span class="stat-value">{{ user.groups ? user.groups.length : 0 }}</span>
                 <span class="stat-label">Groups</span>
               </div>
-              <div class="stat-item">
-                <span class="stat-value">{{ assessmentCount }}</span>
-                <span class="stat-label">Assessments</span>
-              </div>
-              <div v-if="user.role === 'student'" class="stat-item">
-                <span class="stat-value">{{ completedAssessments }}</span>
-                <span class="stat-label">Completed Assessments</span>
-              </div>
             </div>
           </div>
         </div>
@@ -328,7 +320,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
-import { userService, authService } from '../services/api';
+import { userService, authService, courseService } from '../services/api';
 
 const router = useRouter();
 const route = useRoute();
@@ -336,10 +328,6 @@ const user = ref({});
 const loading = ref(true);
 const error = ref(null);
 const isAdmin = ref(false);
-
-// Stats
-const assessmentCount = ref(0);
-const completedAssessments = ref(0);
 
 // Modal state
 const showEditModal = ref(false);
@@ -488,11 +476,19 @@ const fetchUserDetails = async () => {
     const response = await userService.getUserById(userId);
     user.value = response.data;
 
-    // Set mock assessment counts for now
-    // In a real implementation, you would get this from the API
-    assessmentCount.value = Math.floor(Math.random() * 10); // Mock data
-    completedAssessments.value = Math.floor(Math.random() * assessmentCount.value); // Mock data
+    // If the user courses aren't already included in the response,
+    // fetch them separately
+    if (!user.value.courses || user.value.courses.length === 0) {
+      try {
+        const coursesResponse = await courseService.getUserCourses(userId);
+        user.value.courses = coursesResponse.data || [];
+      } catch (err) {
+        console.error('Error fetching user courses:', err);
+        user.value.courses = [];
+      }
+    }
 
+    // Initialize edit form with user data
     initEditForm();
   } catch (err) {
     console.error('Error fetching user details:', err);
@@ -502,21 +498,37 @@ const fetchUserDetails = async () => {
   }
 };
 
-// Check if current user is admin
+// Check if current user is admin or teacher
 const checkAdminStatus = async () => {
   try {
     const response = await authService.checkUserRole();
-    isAdmin.value = response.data.role === 'admin';
+    const userRole = response.data.role;
+    const currentUserId = response.data.id;
 
-    if (!isAdmin.value) {
-      // Redirect non-admin users unless they're viewing their own profile
-      const userId = parseInt(route.params.id);
-      if (userId !== response.data.id) {
-        router.push('/home');
-      }
+    // Allow admin users to view any profile
+    isAdmin.value = userRole === 'admin';
+
+    // Allow teachers to view any profile
+    const isTeacher = userRole === 'teacher';
+
+    // Get the user ID from the route
+    const userId = parseInt(route.params.id);
+
+    // Only redirect if:
+    // 1. User is not an admin AND
+    // 2. User is not a teacher AND
+    // 3. User is not viewing their own profile
+    if (!isAdmin.value && !isTeacher && userId !== currentUserId) {
+      console.log('Access denied: Non-admin/teacher attempting to view another user profile');
+      router.push('/home');
+      return;
     }
+
+    // For debugging
+    console.log(`Access granted: ${userRole} viewing profile ID: ${userId}`);
+
   } catch (err) {
-    console.error('Error checking admin status:', err);
+    console.error('Error checking user role:', err);
     router.push('/home');
   }
 };
