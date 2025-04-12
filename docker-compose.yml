@@ -60,6 +60,22 @@ services:
         networks:
             - app-network
 
+    # phpMyAdmin
+    phpmyadmin:
+        image: phpmyadmin/phpmyadmin
+        container_name: peer-evaluation-phpmyadmin
+        environment:
+            PMA_HOST: db
+            PMA_PORT: 3306
+            MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+            UPLOAD_LIMIT: 300M
+        ports:
+            - '${PHPMYADMIN_PORT:-8080}:80'
+        depends_on:
+            - db
+        networks:
+            - app-network
+
 networks:
     app-network:
         driver: bridge
