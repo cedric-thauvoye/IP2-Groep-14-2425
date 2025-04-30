@@ -23,14 +23,6 @@
             @input="filterStudents"
           >
         </div>
-        <div class="filter-options">
-          <select v-model="courseFilter" @change="filterStudents">
-            <option value="">All Courses</option>
-            <option v-for="course in courses" :key="course.id" :value="course.id">
-              {{ course.name }}
-            </option>
-          </select>
-        </div>
       </div>
 
       <div v-if="loading" class="loading-state">
@@ -45,7 +37,6 @@
               <th>Name</th>
               <th>Email</th>
               <th>Q-Number</th>
-              <th>Courses</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -54,12 +45,6 @@
               <td>{{ student.first_name }} {{ student.last_name }}</td>
               <td>{{ student.email }}</td>
               <td>{{ student.q_number }}</td>
-              <td>
-                <span v-if="student.courses && student.courses.length" class="course-count">
-                  {{ student.courses.length }} course(s)
-                </span>
-                <span v-else class="no-courses">No courses</span>
-              </td>
               <td>
                 <div class="action-buttons">
                   <router-link :to="`/user/${student.id}`" class="view-button">
@@ -148,15 +133,13 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
-import { userService, courseService, authService } from '../services/api';
+import { userService, authService } from '../services/api';
 
 const router = useRouter();
 const students = ref([]);
-const courses = ref([]);
 const loading = ref(true);
 const isTeacher = ref(false);
 const searchQuery = ref('');
-const courseFilter = ref('');
 const filteredStudents = ref([]);
 const showAddStudentModal = ref(false);
 const showEditStudentModal = ref(false);
@@ -175,33 +158,15 @@ const fetchStudents = async () => {
   }
 };
 
-// Get all courses for filter
-const fetchCourses = async () => {
-  try {
-    const response = await courseService.getCourses(isTeacher.value);
-    courses.value = response.data;
-  } catch (error) {
-    console.error('Error fetching courses:', error);
-  }
-};
-
-// Filter students based on search and course filter
+// Filter students based on search only
 const filterStudents = () => {
   const searchTerm = searchQuery.value.toLowerCase();
 
   filteredStudents.value = students.value.filter(student => {
-    // Search filter
-    const matchesSearch =
-      student.first_name.toLowerCase().includes(searchTerm) ||
+    return student.first_name.toLowerCase().includes(searchTerm) ||
       student.last_name.toLowerCase().includes(searchTerm) ||
       student.email.toLowerCase().includes(searchTerm) ||
       (student.q_number && student.q_number.toLowerCase().includes(searchTerm));
-
-    // Course filter
-    const matchesCourse = !courseFilter.value ||
-      (student.courses && student.courses.some(course => course.id === parseInt(courseFilter.value)));
-
-    return matchesSearch && matchesCourse;
   });
 };
 
@@ -217,7 +182,6 @@ const checkUserRole = async () => {
 
 // Edit student function
 const editStudent = (id) => {
-  // Find the student to edit
   const student = students.value.find(s => s.id === id);
   if (student) {
     editingStudent.value = { ...student };
@@ -228,17 +192,14 @@ const editStudent = (id) => {
 // Save edited student
 const saveEditedStudent = async () => {
   try {
-    // Call the API to update the student
     await userService.updateUser(editingStudent.value.id, editingStudent.value);
 
-    // Update the local list
     const index = students.value.findIndex(s => s.id === editingStudent.value.id);
     if (index !== -1) {
       students.value[index] = { ...editingStudent.value };
-      filterStudents(); // Refresh filtered list
+      filterStudents();
     }
 
-    // Close the modal
     showEditStudentModal.value = false;
     editingStudent.value = null;
   } catch (error) {
@@ -250,7 +211,6 @@ const saveEditedStudent = async () => {
 onMounted(async () => {
   await checkUserRole();
   await fetchStudents();
-  await fetchCourses();
 });
 </script>
 
@@ -293,13 +253,14 @@ onMounted(async () => {
 
 .filters {
   display: flex;
-  gap: 1rem;
   margin-bottom: 2rem;
 }
 
 .search-box {
   flex: 1;
   position: relative;
+  display: flex;
+  align-items: center;
 }
 
 .search-box i {
@@ -316,14 +277,8 @@ onMounted(async () => {
   border: 1px solid #ddd;
   border-radius: 8px;
   font-size: 1rem;
-}
-
-.filter-options select {
-  padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  min-width: 200px;
-  font-size: 1rem;
+  height: 46px;
+  box-sizing: border-box;
 }
 
 .students-table {
@@ -348,19 +303,6 @@ onMounted(async () => {
 
 .students-table tr:not(:last-child) td {
   border-bottom: 1px solid #eee;
-}
-
-.course-count {
-  background: #e8f4fc;
-  color: #2980b9;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.9rem;
-}
-
-.no-courses {
-  color: #7f8c8d;
-  font-size: 0.9rem;
 }
 
 .action-buttons {
@@ -461,8 +403,8 @@ onMounted(async () => {
   padding: 0.75rem;
   border: 1px solid #ddd;
   border-radius: 6px;
-  box-sizing: border-box; /* Add this to include padding in width calculation */
-  max-width: 100%; /* Ensure inputs don't exceed their container */
+  box-sizing: border-box;
+  max-width: 100%;
 }
 
 .form-actions {
@@ -507,7 +449,7 @@ onMounted(async () => {
     flex-direction: column;
   }
 
-  .search-box, .filter-options select {
+  .search-box {
     width: 100%;
   }
 }
