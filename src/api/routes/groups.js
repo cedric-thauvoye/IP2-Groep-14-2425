@@ -491,5 +491,109 @@ module.exports = (pool) => {
     }
   });
 
+  // Delete a group (teachers only)
+  router.delete('/:id', authenticateToken, async (req, res) => {
+    try {
+      // Only teachers or admins can delete groups
+      if (req.user.role !== 'teacher' && req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Only teachers can delete groups' });
+      }
+
+      const { id } = req.params;
+      const conn = await pool.getConnection();
+
+      // Begin transaction to ensure all related data is properly cleaned up
+      await conn.beginTransaction();
+
+      try {
+        // Get group info to check permissions
+        const [groupInfo] = await conn.execute(
+          'SELECT course_id FROM groups WHERE id = ?',
+          [id]
+        );
+
+        if (groupInfo.length === 0) {
+          await conn.rollback();
+          conn.release();
+          return res.status(404).json({ message: 'Group not found' });
+        }
+
+        // Check if user is a teacher of this course
+        if (req.user.role === 'teacher') {
+          const [isTeacher] = await conn.execute(
+            'SELECT 1 FROM course_teachers WHERE course_id = ? AND teacher_id = ?',
+            [groupInfo[0].course_id, req.user.id]
+          );
+
+          if (isTeacher.length === 0) {
+            await conn.rollback();
+            conn.release();
+            return res.status(403).json({ message: 'You are not a teacher of this course' });
+          }
+        }
+
+        // Check if there are any assessments for this group
+        const [assessments] = await conn.execute(
+          'SELECT id FROM assessments WHERE group_id = ?',
+          [id]
+        );
+
+        // Delete assessment results
+        if (assessments.length > 0) {
+          for (const assessment of assessments) {
+            // Delete assessment criteria
+            await conn.execute(
+              'DELETE FROM assessment_criteria WHERE assessment_id = ?',
+              [assessment.id]
+            );
+
+            // Delete assessment results
+            await conn.execute(
+              'DELETE FROM assessment_results WHERE assessment_id = ?',
+              [assessment.id]
+            );
+
+            // Delete assessment submissions
+            await conn.execute(
+              'DELETE FROM assessment_submissions WHERE assessment_id = ?',
+              [assessment.id]
+            );
+          }
+
+          // Delete assessments
+          await conn.execute(
+            'DELETE FROM assessments WHERE group_id = ?',
+            [id]
+          );
+        }
+
+        // Delete all students from the group
+        await conn.execute(
+          'DELETE FROM group_students WHERE group_id = ?',
+          [id]
+        );
+
+        // Finally delete the group itself
+        await conn.execute(
+          'DELETE FROM groups WHERE id = ?',
+          [id]
+        );
+
+        // Commit all changes
+        await conn.commit();
+        conn.release();
+
+        res.json({ message: 'Group deleted successfully' });
+      } catch (error) {
+        await conn.rollback();
+        conn.release();
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error deleting group:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
+
   return router;
 };
