@@ -92,7 +92,7 @@
                     @input="filterStudents"
                   >
                 </div>
-                <button v-if="isTeacher" class="add-button" @click="showAddStudentModal = true">
+                <button v-if="isTeacher" class="add-button" @click="openAddStudentModal">
                   <i class="fas fa-plus"></i> Add Student
                 </button>
               </div>
@@ -214,6 +214,141 @@
           </div>
         </div>
 
+        <!-- Add Student Modal -->
+        <div v-if="showAddStudentModal" class="modal-overlay">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h2>Add Student</h2>
+              <button class="close-button" @click="showAddStudentModal = false">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+            <div class="modal-body">
+              <div v-if="loadingStudents" class="loading-indicator">
+                <i class="fas fa-spinner fa-spin"></i> Loading students...
+              </div>
+              <div v-else>
+                <div class="search-box">
+                  <i class="fas fa-search"></i>
+                  <input
+                    type="text"
+                    placeholder="Search students..."
+                    v-model="availableStudentSearch"
+                  >
+                </div>
+
+                <div class="students-list">
+                  <div
+                    v-for="student in filteredAvailableStudents"
+                    :key="student.id"
+                    class="student-option"
+                    @click="addStudentToCourse(student.id)"
+                  >
+                    <div class="student-avatar">
+                      {{ getInitials(student.first_name, student.last_name) }}
+                    </div>
+                    <div class="student-info">
+                      <h3>{{ student.first_name }} {{ student.last_name }}</h3>
+                      <p>{{ student.email }}</p>
+                      <p v-if="student.q_number" class="student-id">{{ student.q_number }}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div v-if="filteredAvailableStudents.length === 0" class="no-results">
+                  No students found matching your search
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Create Group Modal -->
+        <div v-if="showCreateGroupModal" class="modal-overlay">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h2>Create New Group</h2>
+              <button class="close-button" @click="showCreateGroupModal = false">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+            <div class="modal-body">
+              <form @submit.prevent="createGroup">
+                <div class="form-group">
+                  <label for="group-name">Group Name*</label>
+                  <input
+                    type="text"
+                    id="group-name"
+                    v-model="newGroup.name"
+                    required
+                    placeholder="Enter group name"
+                  >
+                </div>
+
+                <div class="form-group">
+                  <label>Add Students (optional)</label>
+                  <div v-if="course.students && course.students.length > 0" class="student-selector">
+                    <div class="selected-students">
+                      <div v-for="selectedId in newGroup.studentIds" :key="selectedId" class="selected-student-chip">
+                        {{ getStudentName(selectedId) }}
+                        <button type="button" @click="removeStudentFromGroup(selectedId)" class="remove-chip">
+                          <i class="fas fa-times"></i>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="student-dropdown">
+                      <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input
+                          type="text"
+                          placeholder="Search students..."
+                          v-model="groupStudentSearch"
+                        >
+                      </div>
+                      <div class="dropdown-options">
+                        <div
+                          v-for="student in filteredCourseStudents"
+                          :key="student.id"
+                          class="student-option"
+                          @click="addStudentToGroup(student.id)"
+                          v-show="!newGroup.studentIds.includes(student.id)"
+                        >
+                          <div class="student-avatar small">
+                            {{ getInitials(student.first_name, student.last_name) }}
+                          </div>
+                          <div class="student-info">
+                            {{ student.first_name }} {{ student.last_name }}
+                          </div>
+                        </div>
+                        <div v-if="filteredCourseStudents.length === 0 || filteredCourseStudents.every(s => newGroup.studentIds.includes(s.id))" class="no-results">
+                          No more students available
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div v-else class="no-students-message">
+                    No students are enrolled in this course yet. Add students to the course first.
+                  </div>
+                </div>
+
+                <div class="form-actions">
+                  <button type="button" class="cancel-button" @click="showCreateGroupModal = false">
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    class="save-button"
+                    :disabled="!newGroup.name || isCreatingGroup"
+                  >
+                    <i v-if="isCreatingGroup" class="fas fa-spinner fa-spin"></i>
+                    <span v-else>Create Group</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
         <!-- Edit Course Modal -->
         <div v-if="showEditCourseModal && editingCourse" class="modal-overlay">
           <div class="modal-content">
@@ -272,7 +407,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
-import { courseService, authService, userService } from '../services/api';
+import { courseService, authService, userService, groupService } from '../services/api';
 
 const router = useRouter();
 const route = useRoute();
@@ -290,6 +425,12 @@ const editingCourse = ref(null);
 const availableTeachers = ref([]);
 const loadingTeachers = ref(false);
 const teacherSearch = ref('');
+const availableStudentSearch = ref('');
+const filteredAvailableStudents = ref([]);
+const loadingStudents = ref(false);
+const newGroup = ref({ name: '', studentIds: [] });
+const groupStudentSearch = ref('');
+const isCreatingGroup = ref(false);
 
 // Get initials for avatar
 const getInitials = (firstName, lastName) => {
@@ -324,6 +465,32 @@ const filteredTeachers = computed(() => {
   });
 });
 
+// Filter available students based on search
+const filterAvailableStudents = () => {
+  const searchTerm = availableStudentSearch.value.toLowerCase();
+  if (!searchTerm) {
+    filteredAvailableStudents.value = course.value.students;
+    return;
+  }
+
+  filteredAvailableStudents.value = course.value.students.filter(student => {
+    return student.first_name.toLowerCase().includes(searchTerm) ||
+           student.last_name.toLowerCase().includes(searchTerm) ||
+           student.email.toLowerCase().includes(searchTerm) ||
+           (student.q_number && student.q_number.toLowerCase().includes(searchTerm));
+  });
+};
+
+// Filter course students for group creation
+const filteredCourseStudents = computed(() => {
+  const searchTerm = groupStudentSearch.value.toLowerCase();
+  return course.value.students.filter(student => {
+    return student.first_name.toLowerCase().includes(searchTerm) ||
+           student.last_name.toLowerCase().includes(searchTerm) ||
+           student.email.toLowerCase().includes(searchTerm);
+  });
+});
+
 // Fetch available teachers (only those with role=teacher)
 const fetchAvailableTeachers = async () => {
   loadingTeachers.value = true;
@@ -336,6 +503,28 @@ const fetchAvailableTeachers = async () => {
   } finally {
     loadingTeachers.value = false;
   }
+};
+
+// Fetch available students (students not already enrolled in this course)
+const fetchAvailableStudents = async () => {
+  loadingStudents.value = true;
+  try {
+    const response = await userService.getStudents();
+    const currentStudentIds = course.value.students.map(s => s.id);
+    const availableStudents = response.data.filter(s => !currentStudentIds.includes(s.id));
+    filteredAvailableStudents.value = availableStudents;
+  } catch (error) {
+    console.error('Error fetching students:', error);
+  } finally {
+    loadingStudents.value = false;
+  }
+};
+
+// Open the add student modal and load available students
+const openAddStudentModal = () => {
+  showAddStudentModal.value = true;
+  fetchAvailableStudents();
+  availableStudentSearch.value = '';
 };
 
 // Show add teacher modal
@@ -418,6 +607,16 @@ const removeStudent = async (studentId) => {
   }
 };
 
+const addStudentToCourse = async (studentId) => {
+  try {
+    await courseService.addStudentToCourse(course.value.id, studentId);
+    showAddStudentModal.value = false;
+    fetchCourseDetails();
+  } catch (error) {
+    console.error('Error adding student:', error);
+  }
+};
+
 // Group actions
 const editGroup = (groupId) => {
   console.log('Edit group:', groupId);
@@ -426,13 +625,62 @@ const editGroup = (groupId) => {
 const deleteGroup = async (groupId) => {
   if (confirm('Are you sure you want to delete this group?')) {
     try {
-      console.log('Deleting group:', groupId);
+      await groupService.deleteGroup(groupId);
       fetchCourseDetails();
     } catch (err) {
       console.error('Error deleting group:', err);
       error.value = 'Failed to delete group. Please try again.';
     }
   }
+};
+
+const createGroup = async () => {
+  isCreatingGroup.value = true;
+  try {
+    // Create the group with the course ID and selected students
+    const groupData = {
+      name: newGroup.value.name,
+      courseId: course.value.id
+    };
+
+    const response = await groupService.createGroupForCourse(course.value.id, groupData);
+
+    // If there are selected students, add them to the group
+    if (newGroup.value.studentIds.length > 0) {
+      // Add each selected student to the group
+      const groupId = response.data.id;
+      const addStudentPromises = newGroup.value.studentIds.map(studentId =>
+        groupService.addStudentToGroup(groupId, studentId)
+      );
+
+      await Promise.all(addStudentPromises);
+    }
+
+    // Reset form and close modal
+    showCreateGroupModal.value = false;
+    newGroup.value = { name: '', studentIds: [] };
+
+    // Refresh course details to show the new group
+    fetchCourseDetails();
+  } catch (error) {
+    console.error('Error creating group:', error);
+    alert('Failed to create group. Please try again.');
+  } finally {
+    isCreatingGroup.value = false;
+  }
+};
+
+const addStudentToGroup = (studentId) => {
+  newGroup.value.studentIds.push(studentId);
+};
+
+const removeStudentFromGroup = (studentId) => {
+  newGroup.value.studentIds = newGroup.value.studentIds.filter(id => id !== studentId);
+};
+
+const getStudentName = (studentId) => {
+  const student = course.value.students.find(s => s.id === studentId);
+  return student ? `${student.first_name} ${student.last_name}` : '';
 };
 
 // Fetch course details
@@ -876,6 +1124,66 @@ onMounted(async () => {
   padding: 0.75rem 1.5rem;
   border-radius: 6px;
   cursor: pointer;
+}
+
+.student-selector {
+  margin-top: 1rem;
+}
+
+.selected-students {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.selected-student-chip {
+  background: #3498db;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.remove-chip {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+}
+
+.student-dropdown {
+  margin-top: 1rem;
+}
+
+.dropdown-options {
+  margin-top: 0.5rem;
+}
+
+.student-option {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.student-option:hover {
+  background-color: #f8f9fa;
+}
+
+.student-avatar.small {
+  width: 30px;
+  height: 30px;
+  font-size: 0.8rem;
+}
+
+.no-students-message {
+  color: #7f8c8d;
+  font-style: italic;
 }
 
 @media (max-width: 992px) {
