@@ -76,7 +76,9 @@ export const groupService = {
   getGroups: (courseId) => apiClient.get(courseId ? `/groups?courseId=${courseId}` : '/groups'),
   getGroupById: (id) => apiClient.get(`/groups/${id}`),
   createGroup: (group) => apiClient.post('/groups', group),
+  createGroupForCourse: (courseId, groupData) => apiClient.post('/groups', { ...groupData, courseId }),
   updateGroup: (id, group) => apiClient.put(`/groups/${id}`, group),
+  deleteGroup: (id) => apiClient.delete(`/groups/${id}`),
   addStudentToGroup: (groupId, studentId) => apiClient.post(`/groups/${groupId}/students`, { studentId }),
   removeStudentFromGroup: (groupId, studentId) => apiClient.delete(`/groups/${groupId}/students/${studentId}`),
 };

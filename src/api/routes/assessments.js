@@ -239,6 +239,15 @@ module.exports = (pool) => {
         [id]
       );
 
+      // Convert min_score and max_score to numbers
+      const formattedCriteria = criteria.map(criterion => ({
+        id: criterion.id,
+        name: criterion.name,
+        description: criterion.description,
+        minScore: parseFloat(criterion.min_score),
+        maxScore: parseFloat(criterion.max_score)
+      }));
+
       // For students, get list of group members to evaluate
       let studentsToEvaluate = [];
       if (req.user.role === 'student') {
@@ -302,7 +311,7 @@ module.exports = (pool) => {
         groupName: assessment.groupName,
         description: assessment.description,
         dueDate: assessment.due_date,
-        criteria: criteria,
+        criteria: formattedCriteria,
         studentsToEvaluate: studentsToEvaluate
       };
 
@@ -331,6 +340,20 @@ module.exports = (pool) => {
 
       const { title, description, courseId, groupId, dueDate, criteria } = req.body;
 
+      // Log the incoming data for debugging
+      console.log('Creating assessment with data:', JSON.stringify({
+        title,
+        description,
+        courseId,
+        groupId,
+        dueDate,
+        criteriaCount: criteria ? criteria.length : 0
+      }));
+
+      if (criteria && criteria.length > 0) {
+        console.log('First criterion sample:', JSON.stringify(criteria[0]));
+      }
+
       if (!title || !courseId || !groupId || !dueDate || !criteria || !criteria.length) {
         return res.status(400).json({ message: 'Missing required fields' });
       }
@@ -339,23 +362,50 @@ module.exports = (pool) => {
       await conn.beginTransaction();
 
       try {
-        // Create assessment
+        // Format the date correctly for MySQL
+        // Extract only the YYYY-MM-DD HH:MM:SS part that MySQL can understand
+        const formattedDueDate = new Date(dueDate).toISOString().slice(0, 19).replace('T', ' ');
+
+        console.log('Executing SQL to create assessment with formatted due date:', formattedDueDate);
         const [assessmentResult] = await conn.execute(
           'INSERT INTO assessments (title, description, course_id, group_id, teacher_id, due_date) VALUES (?, ?, ?, ?, ?, ?)',
-          [title, description, courseId, groupId, req.user.id, dueDate]
+          [title, description || '', courseId, groupId, req.user.id, formattedDueDate]
         );
 
         const assessmentId = assessmentResult.insertId;
+        console.log('Assessment created with ID:', assessmentId);
 
         // Create criteria
         for (const criterion of criteria) {
-          await conn.execute(
-            'INSERT INTO assessment_criteria (assessment_id, name, description, min_score, max_score) VALUES (?, ?, ?, ?, ?)',
-            [assessmentId, criterion.name, criterion.description, criterion.minScore, criterion.maxScore]
-          );
+          console.log('Adding criterion:', JSON.stringify(criterion));
+          try {
+            // Convert minScore and maxScore to numbers to ensure proper database type handling
+            const minScore = parseFloat(criterion.minScore);
+            const maxScore = parseFloat(criterion.maxScore);
+
+            // Validate the scores
+            if (isNaN(minScore) || isNaN(maxScore)) {
+              throw new Error('Invalid score values. Min and max scores must be numbers.');
+            }
+
+            await conn.execute(
+              'INSERT INTO assessment_criteria (assessment_id, name, description, min_score, max_score) VALUES (?, ?, ?, ?, ?)',
+              [
+                assessmentId,
+                criterion.name,
+                criterion.description || '',
+                minScore,
+                maxScore
+              ]
+            );
+          } catch (criterionError) {
+            console.error('Error adding criterion:', criterionError);
+            throw criterionError;
+          }
         }
 
         await conn.commit();
+        console.log('Assessment creation transaction committed successfully');
         conn.release();
 
         res.status(201).json({
@@ -363,13 +413,14 @@ module.exports = (pool) => {
           assessmentId
         });
       } catch (error) {
+        console.error('Transaction error during assessment creation:', error);
         await conn.rollback();
         conn.release();
         throw error;
       }
     } catch (error) {
       console.error('Error creating assessment:', error);
-      res.status(500).json({ message: 'Server error' });
+      res.status(500).json({ message: 'Server error', details: error.message });
     }
   });
 
