@@ -81,6 +81,7 @@ export const groupService = {
   deleteGroup: (id) => apiClient.delete(`/groups/${id}`),
   addStudentToGroup: (groupId, studentId) => apiClient.post(`/groups/${groupId}/students`, { studentId }),
   removeStudentFromGroup: (groupId, studentId) => apiClient.delete(`/groups/${groupId}/students/${studentId}`),
+  getAvailableStudents: (groupId) => apiClient.get(`/groups/${groupId}/available-students`),
 };
 
 // User/student services

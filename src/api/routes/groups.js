@@ -434,5 +434,62 @@ module.exports = (pool) => {
     }
   });
 
+  // Get available students for a group (students in the course but not in the group)
+  router.get('/:id/available-students', authenticateToken, async (req, res) => {
+    try {
+      // Only teachers can see available students
+      if (req.user.role !== 'teacher' && req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Only teachers can view available students' });
+      }
+
+      const { id } = req.params;
+      const conn = await pool.getConnection();
+
+      // Get course_id for this group
+      const [groupInfo] = await conn.execute(
+        'SELECT course_id FROM groups WHERE id = ?',
+        [id]
+      );
+
+      if (groupInfo.length === 0) {
+        conn.release();
+        return res.status(404).json({ message: 'Group not found' });
+      }
+
+      const courseId = groupInfo[0].course_id;
+
+      // Check if user is a teacher of this course
+      if (req.user.role === 'teacher') {
+        const [isTeacher] = await conn.execute(
+          'SELECT 1 FROM course_teachers WHERE course_id = ? AND teacher_id = ?',
+          [courseId, req.user.id]
+        );
+
+        if (isTeacher.length === 0) {
+          conn.release();
+          return res.status(403).json({ message: 'You are not a teacher of this course' });
+        }
+      }
+
+      // Get students who are in the course but not in the group
+      const [students] = await conn.execute(`
+        SELECT u.id, u.first_name, u.last_name, u.email, u.q_number
+        FROM users u
+        JOIN course_students cs ON u.id = cs.student_id
+        WHERE cs.course_id = ?
+        AND u.id NOT IN (
+          SELECT student_id FROM group_students WHERE group_id = ?
+        )
+        ORDER BY u.last_name, u.first_name
+      `, [courseId, id]);
+
+      conn.release();
+      res.json(students);
+    } catch (error) {
+      console.error('Error fetching available students:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
+
   return router;
 };
