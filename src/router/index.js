@@ -10,7 +10,8 @@ import StudentsView from '../views/StudentsView.vue'
 import ImportView from '../views/ImportView.vue'
 import AssessmentsView from '../views/AssessmentsView.vue'
 import ResultsView from '../views/ResultsView.vue'
-import UserDetailView from '../views/UserDetailView.vue'
+import AssessmentDetailView from '../views/AssessmentDetailView.vue'
+import ResultsDetailView from '../views/ResultsDetailView.vue'
 
 // Auth guard function to check for token
 const requireAuth = (to, from, next) => {
@@ -80,6 +81,18 @@ const router = createRouter({
       beforeEnter: requireAuth
     },
     {
+      path: '/assessment/:id',
+      name: 'assessment-detail',
+      component: AssessmentDetailView,
+      beforeEnter: requireAuth
+    },
+    {
+      path: '/assessment/:id/results',
+      name: 'assessment-results',
+      component: ResultsDetailView,
+      beforeEnter: requireAuth
+    },
+    {
       path: '/results',
       name: 'results',
       component: ResultsView,
@@ -130,10 +143,8 @@ const router = createRouter({
     {
       path: '/user/:id',
       name: 'user-detail',
-      component: UserDetailView,
-      meta: {
-        requiresAuth: true
-      }
+      component: () => import('../views/UserDetailView.vue'),
+      beforeEnter: requireAuth
     }
   ]
 })
