@@ -237,11 +237,13 @@ const saveEditedGroup = async () => {
 const deleteGroup = async (id) => {
   if (confirm('Are you sure you want to delete this group?')) {
     try {
-      // In a real implementation, you would call an API to delete the group
-      console.log('Delete group:', id);
-      groups.value = groups.value.filter(group => group.id !== id);
+      await groupService.deleteGroup(id);
+      // Refresh the group list
+      const response = await groupService.getGroups();
+      groups.value = response.data;
     } catch (error) {
       console.error('Error deleting group:', error);
+      alert('Failed to delete group. Please try again.');
     }
   }
 };
