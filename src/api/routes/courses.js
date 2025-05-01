@@ -497,5 +497,126 @@ module.exports = (pool) => {
     }
   });
 
+  // Delete a course (teachers or admin only)
+  router.delete('/:id', authenticateToken, async (req, res) => {
+    try {
+      // Only teachers or admins can delete courses
+      if (req.user.role !== 'teacher' && req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Only teachers can delete courses' });
+      }
+
+      const { id } = req.params;
+      const conn = await pool.getConnection();
+
+      // Begin transaction to ensure all related data is properly cleaned up
+      await conn.beginTransaction();
+
+      try {
+        // Check if user is a teacher of this course (if not admin)
+        if (req.user.role === 'teacher') {
+          const [isTeacher] = await conn.execute(
+            'SELECT 1 FROM course_teachers WHERE course_id = ? AND teacher_id = ?',
+            [id, req.user.id]
+          );
+
+          if (isTeacher.length === 0) {
+            await conn.rollback();
+            conn.release();
+            return res.status(403).json({ message: 'You are not a teacher of this course' });
+          }
+        }
+
+        // First, get all groups in this course
+        const [groups] = await conn.execute(
+          'SELECT id FROM groups WHERE course_id = ?',
+          [id]
+        );
+
+        // For each group, delete all related data
+        for (const group of groups) {
+          // Get assessments for this group
+          const [assessments] = await conn.execute(
+            'SELECT id FROM assessments WHERE group_id = ?',
+            [group.id]
+          );
+
+          // Delete assessment data
+          for (const assessment of assessments) {
+            // Delete assessment criteria
+            await conn.execute(
+              'DELETE FROM assessment_criteria WHERE assessment_id = ?',
+              [assessment.id]
+            );
+
+            // Delete assessment results
+            await conn.execute(
+              'DELETE FROM assessment_results WHERE assessment_id = ?',
+              [assessment.id]
+            );
+
+            // Delete assessment submissions
+            await conn.execute(
+              'DELETE FROM assessment_submissions WHERE assessment_id = ?',
+              [assessment.id]
+            );
+          }
+
+          // Delete all assessments for this group
+          if (assessments.length > 0) {
+            await conn.execute(
+              'DELETE FROM assessments WHERE group_id = ?',
+              [group.id]
+            );
+          }
+
+          // Delete all students from the group
+          await conn.execute(
+            'DELETE FROM group_students WHERE group_id = ?',
+            [group.id]
+          );
+        }
+
+        // Delete all groups in the course
+        if (groups.length > 0) {
+          await conn.execute(
+            'DELETE FROM groups WHERE course_id = ?',
+            [id]
+          );
+        }
+
+        // Delete all teacher assignments for this course
+        await conn.execute(
+          'DELETE FROM course_teachers WHERE course_id = ?',
+          [id]
+        );
+
+        // Delete all student enrollments for this course
+        await conn.execute(
+          'DELETE FROM course_students WHERE course_id = ?',
+          [id]
+        );
+
+        // Finally delete the course itself
+        await conn.execute(
+          'DELETE FROM courses WHERE id = ?',
+          [id]
+        );
+
+        // Commit all changes
+        await conn.commit();
+        conn.release();
+
+        res.json({ message: 'Course deleted successfully' });
+      } catch (error) {
+        await conn.rollback();
+        conn.release();
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error deleting course:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
+
   return router;
 };

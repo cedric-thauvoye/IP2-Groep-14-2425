@@ -65,6 +65,7 @@ export const courseService = {
   getCourseById: (id) => apiClient.get(`/courses/${id}`),
   createCourse: (course) => apiClient.post('/courses', course),
   updateCourse: (id, course) => apiClient.put(`/courses/${id}`, course),
+  deleteCourse: (id) => apiClient.delete(`/courses/${id}`),
   addStudentToCourse: (courseId, studentId) => apiClient.post(`/courses/${courseId}/students`, { studentId }),
   removeStudentFromCourse: (courseId, studentId) => apiClient.delete(`/courses/${courseId}/students/${studentId}`),
   addTeacherToCourse: (courseId, teacherId) => apiClient.post(`/courses/${courseId}/teachers`, { teacherId }),
