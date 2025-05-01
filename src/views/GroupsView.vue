@@ -113,6 +113,60 @@
           </div>
         </div>
       </div>
+
+      <!-- Create Group Modal -->
+      <div v-if="showCreateGroupModal" class="modal-overlay">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>Create New Group</h2>
+            <button class="close-button" @click="showCreateGroupModal = false">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <div class="modal-body">
+            <form @submit.prevent="createNewGroup">
+              <div class="form-group">
+                <label for="new-group-name">Group Name</label>
+                <input
+                  type="text"
+                  id="new-group-name"
+                  v-model="newGroup.name"
+                  required
+                >
+              </div>
+              <div class="form-group">
+                <label for="new-group-course">Course</label>
+                <select
+                  id="new-group-course"
+                  v-model="newGroup.courseId"
+                  required
+                >
+                  <option value="" disabled>Select a course</option>
+                  <option v-for="course in courses" :key="course.id" :value="course.id">
+                    {{ course.name }}
+                  </option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="new-group-description">Description</label>
+                <textarea
+                  id="new-group-description"
+                  v-model="newGroup.description"
+                  rows="3"
+                ></textarea>
+              </div>
+              <div class="form-actions">
+                <button type="button" class="cancel-button" @click="showCreateGroupModal = false">
+                  Cancel
+                </button>
+                <button type="submit" class="save-button">
+                  Create Group
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
     </div>
   </PageLayout>
 </template>
@@ -133,6 +187,11 @@ const showEditGroupModal = ref(false);
 const editingGroup = ref(null);
 const searchQuery = ref('');
 const courseFilter = ref('');
+const newGroup = ref({
+  name: '',
+  courseId: '',
+  description: ''
+});
 
 // New computed property to filter groups based on search and course filter
 const filteredGroups = computed(() => {
@@ -184,6 +243,26 @@ const deleteGroup = async (id) => {
     } catch (error) {
       console.error('Error deleting group:', error);
     }
+  }
+};
+
+const createNewGroup = async () => {
+  try {
+    await groupService.createGroup(newGroup.value);
+    // Refresh the group list
+    const response = await groupService.getGroups();
+    groups.value = response.data;
+
+    // Reset form and close modal
+    showCreateGroupModal.value = false;
+    newGroup.value = {
+      name: '',
+      courseId: '',
+      description: ''
+    };
+  } catch (error) {
+    console.error('Error creating group:', error);
+    alert('Failed to create group. Please try again.');
   }
 };
 

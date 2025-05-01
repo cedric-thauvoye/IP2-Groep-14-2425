@@ -145,15 +145,192 @@
           </div>
         </div>
       </div>
+
+      <!-- Add Student Modal -->
+      <div v-if="showAddStudentModal" class="modal-overlay">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>Add Student to Group</h2>
+            <button class="close-button" @click="showAddStudentModal = false">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div v-if="loadingStudents" class="loading-indicator">
+              <i class="fas fa-spinner fa-spin"></i>
+              <span>Loading students...</span>
+            </div>
+            <div v-else-if="availableStudents.length === 0" class="no-students">
+              <p>No available students to add to this group.</p>
+            </div>
+            <div v-else>
+              <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input
+                  type="text"
+                  v-model="studentSearchQuery"
+                  placeholder="Search students..."
+                  @input="filterStudents"
+                >
+              </div>
+
+              <div class="students-select-list">
+                <div
+                  v-for="student in filteredStudents"
+                  :key="student.id"
+                  class="student-select-item"
+                >
+                  <div class="student-info">
+                    <div class="student-avatar">
+                      {{ getInitials(student.first_name, student.last_name) }}
+                    </div>
+                    <div class="student-details">
+                      <h3>{{ student.first_name }} {{ student.last_name }}</h3>
+                      <p class="student-email">{{ student.email }}</p>
+                      <p class="student-id">{{ student.q_number }}</p>
+                    </div>
+                  </div>
+                  <button class="add-student-button" @click="addStudent(student.id)">
+                    <i class="fas fa-plus"></i> Add
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="button" class="cancel-button" @click="showAddStudentModal = false">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Create Assessment Modal -->
+      <div v-if="showCreateAssessmentModal" class="modal-overlay">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>Create Assessment</h2>
+            <button class="close-button" @click="showCreateAssessmentModal = false">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <div class="modal-body">
+            <form @submit.prevent="submitNewAssessment">
+              <div class="form-group">
+                <label for="assessment-title">Title</label>
+                <input
+                  type="text"
+                  id="assessment-title"
+                  v-model="newAssessment.title"
+                  required
+                >
+              </div>
+              <div class="form-group">
+                <label for="assessment-description">Description</label>
+                <textarea
+                  id="assessment-description"
+                  v-model="newAssessment.description"
+                  rows="3"
+                ></textarea>
+              </div>
+              <div class="form-group">
+                <label for="assessment-due-date">Due Date</label>
+                <input
+                  type="datetime-local"
+                  id="assessment-due-date"
+                  v-model="newAssessment.dueDate"
+                  required
+                >
+              </div>
+
+              <div class="assessment-criteria">
+                <h3>Criteria</h3>
+                <div
+                  v-for="(criterion, index) in newAssessment.criteria"
+                  :key="index"
+                  class="criterion-item"
+                >
+                  <div class="criterion-header">
+                    <h4>Criterion {{ index + 1 }}</h4>
+                    <button type="button" class="remove-criterion" @click="removeCriterion(index)">
+                      <i class="fas fa-times"></i>
+                    </button>
+                  </div>
+
+                  <div class="form-group">
+                    <label :for="`criterion-name-${index}`">Name</label>
+                    <input
+                      type="text"
+                      :id="`criterion-name-${index}`"
+                      v-model="criterion.name"
+                      required
+                    >
+                  </div>
+
+                  <div class="form-group">
+                    <label :for="`criterion-description-${index}`">Description</label>
+                    <textarea
+                      :id="`criterion-description-${index}`"
+                      v-model="criterion.description"
+                      rows="2"
+                    ></textarea>
+                  </div>
+
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label :for="`criterion-min-score-${index}`">Min Score</label>
+                      <input
+                        type="number"
+                        :id="`criterion-min-score-${index}`"
+                        v-model="criterion.minScore"
+                        required
+                        min="0"
+                      >
+                    </div>
+                    <div class="form-group">
+                      <label :for="`criterion-max-score-${index}`">Max Score</label>
+                      <input
+                        type="number"
+                        :id="`criterion-max-score-${index}`"
+                        v-model="criterion.maxScore"
+                        required
+                        min="1"
+                      >
+                    </div>
+                  </div>
+                </div>
+
+                <button type="button" class="add-criterion-button" @click="addCriterion">
+                  <i class="fas fa-plus"></i> Add Criterion
+                </button>
+              </div>
+
+              <div class="form-actions">
+                <button type="button" class="cancel-button" @click="showCreateAssessmentModal = false">
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  class="save-button"
+                  :disabled="!isAssessmentFormValid || submittingAssessment"
+                >
+                  <i v-if="submittingAssessment" class="fas fa-spinner fa-spin"></i>
+                  <span v-else>Create Assessment</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
     </div>
   </PageLayout>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
-import { groupService, authService } from '../services/api';
+import { groupService, authService, assessmentService, userService } from '../services/api';
 
 const router = useRouter();
 const route = useRoute();
@@ -164,6 +341,27 @@ const isTeacher = ref(false);
 const showAddStudentModal = ref(false);
 const showEditGroupModal = ref(false);
 const editingGroup = ref(null);
+const loadingStudents = ref(false);
+const availableStudents = ref([]);
+const studentSearchQuery = ref('');
+const filteredStudents = ref([]);
+const showCreateAssessmentModal = ref(false);
+const submittingAssessment = ref(false);
+const newAssessment = ref({
+  title: '',
+  description: '',
+  dueDate: '',
+  groupId: '',
+  courseId: '',
+  criteria: [
+    {
+      name: 'Participation',
+      description: 'Level of participation in group activities',
+      minScore: 1,
+      maxScore: 10
+    }
+  ]
+});
 
 // Format date function
 const formatDate = (dateString) => {
@@ -251,12 +449,111 @@ const removeStudent = async (studentId) => {
 
 // Create assessment for group
 const createAssessment = () => {
-  // Navigate to assessment creation page with group pre-selected
-  router.push({
-    path: '/assessments/create',
-    query: { groupId: group.value.id }
+  // Set groupId and courseId
+  newAssessment.value.groupId = group.value.id;
+  newAssessment.value.courseId = group.value.course_id;
+
+  // Format date to ISO string
+  if (!newAssessment.value.dueDate) {
+    // Set default due date to 7 days from now
+    const date = new Date();
+    date.setDate(date.getDate() + 7);
+    newAssessment.value.dueDate = new Date(date).toISOString().slice(0, 16);
+  }
+
+  // Open modal
+  showCreateAssessmentModal.value = true;
+};
+
+// Add criterion
+const addCriterion = () => {
+  newAssessment.value.criteria.push({
+    name: '',
+    description: '',
+    minScore: 1,
+    maxScore: 10
   });
 };
+
+// Remove criterion
+const removeCriterion = (index) => {
+  if (newAssessment.value.criteria.length > 1) {
+    newAssessment.value.criteria.splice(index, 1);
+  }
+};
+
+// Submit new assessment
+const submitNewAssessment = async () => {
+  if (!isAssessmentFormValid.value) {
+    return;
+  }
+
+  submittingAssessment.value = true;
+
+  try {
+    // Format data for API
+    const assessmentData = {
+      title: newAssessment.value.title,
+      description: newAssessment.value.description,
+      dueDate: new Date(newAssessment.value.dueDate).toISOString(),
+      groupId: newAssessment.value.groupId,
+      courseId: newAssessment.value.courseId,
+      criteria: newAssessment.value.criteria.map(c => ({
+        name: c.name,
+        description: c.description,
+        minScore: parseFloat(c.minScore),
+        maxScore: parseFloat(c.maxScore)
+      }))
+    };
+
+    // Call API to create assessment
+    await assessmentService.createAssessment(assessmentData);
+
+    // Reset form
+    newAssessment.value = {
+      title: '',
+      description: '',
+      dueDate: '',
+      groupId: '',
+      courseId: '',
+      criteria: [
+        {
+          name: 'Participation',
+          description: 'Level of participation in group activities',
+          minScore: 1,
+          maxScore: 10
+        }
+      ]
+    };
+
+    // Close modal
+    showCreateAssessmentModal.value = false;
+
+    // Refresh group data
+    fetchGroupDetails();
+
+  } catch (err) {
+    console.error('Error creating assessment:', err);
+    error.value = 'Failed to create assessment. Please try again.';
+  } finally {
+    submittingAssessment.value = false;
+  }
+};
+
+// Check if assessment form is valid
+const isAssessmentFormValid = computed(() => {
+  return (
+    newAssessment.value.title.trim() !== '' &&
+    newAssessment.value.dueDate !== '' &&
+    newAssessment.value.criteria.length > 0 &&
+    newAssessment.value.criteria.every(
+      c => c.name.trim() !== '' &&
+          c.minScore !== null &&
+          c.maxScore !== null &&
+          parseFloat(c.maxScore) > parseFloat(c.minScore)
+    )
+  );
+});
 
 // Fetch group details
 const fetchGroupDetails = async () => {
@@ -275,6 +572,33 @@ const fetchGroupDetails = async () => {
   }
 };
 
+// Fetch available students
+const fetchAvailableStudents = async () => {
+  loadingStudents.value = true;
+
+  try {
+    const response = await groupService.getAvailableStudents(group.value.id);
+    availableStudents.value = response.data;
+    filteredStudents.value = response.data;
+  } catch (err) {
+    console.error('Error fetching available students:', err);
+    error.value = 'Failed to load available students. Please try again.';
+  } finally {
+    loadingStudents.value = false;
+  }
+};
+
+// Filter students based on search query
+const filterStudents = () => {
+  const query = studentSearchQuery.value.toLowerCase();
+  filteredStudents.value = availableStudents.value.filter(student =>
+    student.first_name.toLowerCase().includes(query) ||
+    student.last_name.toLowerCase().includes(query) ||
+    student.email.toLowerCase().includes(query) ||
+    student.q_number.toLowerCase().includes(query)
+  );
+};
+
 // Check user role
 const checkUserRole = async () => {
   try {
@@ -288,6 +612,7 @@ const checkUserRole = async () => {
 onMounted(async () => {
   await checkUserRole();
   await fetchGroupDetails();
+  await fetchAvailableStudents();
 });
 </script>
 
@@ -612,6 +937,47 @@ onMounted(async () => {
   padding: 0.75rem 1.5rem;
   border-radius: 6px;
   cursor: pointer;
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.search-box input {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+}
+
+.students-select-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.student-select-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-radius: 8px;
+  background: #f8f9fa;
+}
+
+.add-student-button {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 @media (max-width: 992px) {
