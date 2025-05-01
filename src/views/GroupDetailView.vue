@@ -411,9 +411,8 @@ const confirmDeleteGroup = () => {
 
 const deleteGroup = async () => {
   try {
-    // Implement actual delete call
-    // await groupService.deleteGroup(group.value.id);
-    console.log('Deleting group:', group.value.id);
+    await groupService.deleteGroup(group.value.id);
+    // Redirect to groups page after successful deletion
     router.push('/groups');
   } catch (err) {
     console.error('Error deleting group:', err);
