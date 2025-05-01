@@ -77,6 +77,64 @@
         <p>{{ isTeacher ? 'Create a new course to get started' : 'You are not enrolled in any courses' }}</p>
       </div>
 
+      <!-- Create Course Modal -->
+      <div v-if="showCreateCourseModal" class="modal-overlay">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>Create New Course</h2>
+            <button class="close-button" @click="showCreateCourseModal = false">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <div class="modal-body">
+            <form @submit.prevent="createNewCourse">
+              <div class="form-group">
+                <label for="new-course-name">Course Name*</label>
+                <input
+                  type="text"
+                  id="new-course-name"
+                  v-model="newCourse.name"
+                  required
+                  placeholder="Enter course name"
+                >
+              </div>
+              <div class="form-group">
+                <label for="new-course-code">Course Code*</label>
+                <input
+                  type="text"
+                  id="new-course-code"
+                  v-model="newCourse.code"
+                  required
+                  placeholder="Enter course code (e.g. CS101)"
+                >
+              </div>
+              <div class="form-group">
+                <label for="new-course-description">Description</label>
+                <textarea
+                  id="new-course-description"
+                  v-model="newCourse.description"
+                  rows="4"
+                  placeholder="Describe the course content and objectives"
+                ></textarea>
+              </div>
+              <div class="form-actions">
+                <button type="button" class="cancel-button" @click="showCreateCourseModal = false">
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  class="save-button"
+                  :disabled="isCreating"
+                >
+                  <i v-if="isCreating" class="fas fa-spinner fa-spin"></i>
+                  <span v-else>Create Course</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
       <!-- Edit Course Modal -->
       <div v-if="showEditCourseModal && editingCourse" class="modal-overlay">
         <div class="modal-content">
@@ -145,6 +203,13 @@ const isTeacher = ref(false);
 const showCreateCourseModal = ref(false);
 const showEditCourseModal = ref(false);
 const editingCourse = ref(null);
+const isCreating = ref(false);
+
+const newCourse = ref({
+  name: '',
+  code: '',
+  description: ''
+});
 
 const getRandomColor = () => {
   const colors = ['#3498db', '#2ecc71', '#e74c3c', '#f1c40f', '#9b59b6', '#1abc9c'];
@@ -172,7 +237,6 @@ const editCourse = (course) => {
 const saveEditedCourse = async () => {
   try {
     await courseService.updateCourse(editingCourse.value.id, editingCourse.value);
-    // Refresh the course list
     const coursesResponse = await courseService.getCourses(isTeacher.value ? 'true' : false);
     courses.value = coursesResponse.data.map(course => ({
       ...course,
@@ -186,28 +250,54 @@ const saveEditedCourse = async () => {
   }
 };
 
+const createNewCourse = async () => {
+  try {
+    isCreating.value = true;
+    const response = await courseService.createCourse(newCourse.value);
+
+    courses.value.push({
+      ...response.data,
+      isActive: true,
+      student_count: 0,
+      teacher_count: 1,
+      group_count: 0
+    });
+
+    newCourse.value = {
+      name: '',
+      code: '',
+      description: ''
+    };
+    showCreateCourseModal.value = false;
+
+    router.push(`/course/${response.data.id}`);
+  } catch (error) {
+    console.error('Error creating course:', error);
+    alert('Failed to create course. Please check if the course code is unique.');
+  } finally {
+    isCreating.value = false;
+  }
+};
+
 const deleteCourse = async (id) => {
-  // Implement delete course functionality
   if (confirm('Are you sure you want to delete this course?')) {
     try {
-      // Implement course deletion
-      console.log('Delete course:', id);
+      await courseService.deleteCourse(id);
+      courses.value = courses.value.filter(course => course.id !== id);
     } catch (error) {
       console.error('Error deleting course:', error);
+      alert('Failed to delete course.');
     }
   }
 };
 
 onMounted(async () => {
   try {
-    // Check if user is a teacher
     const roleResponse = await authService.checkUserRole();
     isTeacher.value = roleResponse.data.role === 'teacher' || roleResponse.data.role === 'admin';
 
-    // Fetch courses
     const coursesResponse = await courseService.getCourses(isTeacher.value ? 'true' : false);
 
-    // Transform data with additional properties if needed
     courses.value = coursesResponse.data.map(course => ({
       ...course,
       isActive: true
@@ -240,9 +330,9 @@ onMounted(async () => {
 
 .filters {
   display: flex;
-  gap: .5rem; /* Significantly increased gap between search and filter */
+  gap: .5rem;
   margin-bottom: 2rem;
-  align-items: stretch; /* Ensure all elements stretch to the same height */
+  align-items: stretch;
 }
 
 .search-box {
@@ -266,7 +356,7 @@ onMounted(async () => {
   border: 1px solid #ddd;
   border-radius: 8px;
   font-size: 1rem;
-  height: 46px; /* Exact height specification */
+  height: 46px;
   box-sizing: border-box;
 }
 
@@ -276,7 +366,7 @@ onMounted(async () => {
   border-radius: 8px;
   font-size: 1rem;
   min-width: 200px;
-  height: 46px; /* Exact same height as search input */
+  height: 46px;
   box-sizing: border-box;
 }
 
