@@ -1,5 +1,4 @@
 const mysql = require('mysql2/promise');
-require('dotenv').config({ path: process.cwd() + '/.env' });
 
 // Required tables that should exist in the database
 const requiredTables = [
@@ -23,10 +22,10 @@ const verifyDatabase = async () => {
   let connection;
   try {
     connection = await mysql.createConnection({
-      host: process.env.MYSQL_HOST || 'localhost',
-      user: process.env.MYSQL_USER || 'root',
-      password: process.env.MYSQL_PASSWORD || '',
-      database: process.env.MYSQL_DATABASE || 'peer_evaluation',
+      host: process.env.MYSQL_HOST,
+      user: process.env.MYSQL_USER,
+      password: process.env.MYSQL_PASSWORD,
+      database: process.env.MYSQL_DATABASE,
     });
 
     console.log('✅ Connected to database successfully');

@@ -5,14 +5,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const fs = require('fs');
 const path = require('path');
-const dotenv = require('dotenv');
 const bodyParser = require('body-parser');
-
-// Load environment variables from .env file
-const result = dotenv.config();
-if (result.error) {
-  console.error('Error loading .env file:', result.error);
-}
 
 // Verify required env variables are set
 const requiredEnvVars = ['MYSQL_HOST', 'MYSQL_USER', 'MYSQL_PASSWORD', 'MYSQL_DATABASE', 'JWT_SECRET'];
@@ -96,7 +89,7 @@ const testDatabaseConnection = async () => {
     connection.release();
     return true;
   } catch (err) {
-    console.error('Database connection error:', err);
+    console.error('Database connection error (' + process.env.MYSQL_HOST + '):', err);
     console.error('Please ensure the database is created and credentials are correct.');
     console.error('Manual schema setup is required - run the schema.sql file in your MySQL client.');
     return false;
