@@ -13,10 +13,19 @@
             <div class="filters">
                 <div class="filter-group">
                     <label>Course:</label>
-                    <select v-model="selectedCourse">
+                    <select v-model="selectedCourse" @change="loadGroups">
                         <option value="">All Courses</option>
                         <option v-for="course in courses" :key="course.id" :value="course.id">
                             {{ course.name }}
+                        </option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Group:</label>
+                    <select v-model="selectedGroup">
+                        <option value="">All Groups</option>
+                        <option v-for="group in availableGroups" :key="group.id" :value="group.id">
+                            {{ group.name }}
                         </option>
                     </select>
                 </div>
@@ -63,19 +72,21 @@
                                     <th>Student</th>
                                     <th>Assessment</th>
                                     <th>Course</th>
+                                    <th>Group</th>
                                     <th>Score</th>
                                     <th>Date</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for="result in filteredResults" :key="result.id">
+                                <tr v-for="result in filteredResults" :key="`${result.id}-${result.studentId || 'unknown'}`">
                                     <td>{{ result.studentName }}</td>
                                     <td>{{ result.assessmentTitle }}</td>
                                     <td>{{ result.courseName }}</td>
+                                    <td>{{ result.groupName }}</td>
                                     <td>
                                         <span class="score" :class="getScoreClass(result.score)">
-                                            {{ result.score }}/10
+                                            {{ result.score === 'N/A' || result.score === 'Pending' ? result.score : result.score.toFixed(1) }}
                                         </span>
                                     </td>
                                     <td>{{ formatDate(result.date) }}</td>
@@ -98,28 +109,50 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
-import { courseService, assessmentService } from '../services/api';
+import { courseService, assessmentService, groupService } from '../services/api';
 
 const router = useRouter();
 const loading = ref(true);
 const selectedCourse = ref('');
+const selectedGroup = ref('');
 const selectedPeriod = ref('all');
 const results = ref([]);
 const courses = ref([]);
+const availableGroups = ref([]);
 
-// Mock data for testing
-const totalAssessments = computed(() => results.value.length);
+// Stats from API data
+const totalAssessments = computed(() => {
+    const uniqueAssessments = new Set(results.value.map(r => r.id));
+    return uniqueAssessments.size;
+});
+
 const averageScore = computed(() => {
     if (results.value.length === 0) return 0;
-    const scores = results.value.map(r => parseFloat(r.score));
-    return scores.reduce((a, b) => a + b, 0) / scores.length;
+
+    const validScores = results.value
+        .filter(r => typeof r.score === 'number')
+        .map(r => r.score);
+
+    if (validScores.length === 0) return 0;
+    return validScores.reduce((a, b) => a + b, 0) / validScores.length;
 });
-const completionRate = computed(() => 85); // Mock data
+
+const completionRate = computed(() => {
+    if (results.value.length === 0) return 0;
+
+    const completed = results.value.filter(r => typeof r.score === 'number').length;
+    return Math.round((completed / results.value.length) * 100);
+});
 
 const filteredResults = computed(() => {
     let filtered = [...results.value];
+
     if (selectedCourse.value) {
         filtered = filtered.filter(r => r.courseId === parseInt(selectedCourse.value));
+    }
+
+    if (selectedGroup.value) {
+        filtered = filtered.filter(r => r.groupId === parseInt(selectedGroup.value));
     }
 
     // Add period filtering logic
@@ -137,29 +170,64 @@ const filteredResults = computed(() => {
 });
 
 const formatDate = (date) => {
-    return new Date(date).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-    });
+    if (!date) return 'N/A';
+
+    try {
+        return new Date(date).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    } catch (error) {
+        console.error('Error formatting date:', error);
+        return date; // Return the original string if parsing fails
+    }
 };
 
 const getScoreClass = (score) => {
-    score = parseFloat(score);
+    if (score === 'N/A' || score === 'Pending') return 'pending';
+
+    if (typeof score !== 'number') return 'pending';
     if (score >= 8) return 'excellent';
     if (score >= 6) return 'good';
     return 'needs-improvement';
 };
 
+const loadGroups = async () => {
+    if (!selectedCourse.value) {
+        availableGroups.value = [];
+        selectedGroup.value = '';
+        return;
+    }
+
+    try {
+        const response = await groupService.getGroups(selectedCourse.value);
+        availableGroups.value = response.data;
+    } catch (error) {
+        console.error('Error loading groups:', error);
+        availableGroups.value = [];
+    }
+};
+
 const exportResults = () => {
-    const headers = ['Student', 'Assessment', 'Course', 'Score', 'Date'];
+    const headers = ['Student', 'Assessment', 'Course', 'Group', 'Score', 'Date'];
+
+    // Escape CSV field to handle commas in data
+    const escapeField = (field) => {
+        if (field && typeof field === 'string' && (field.includes(',') || field.includes('"'))) {
+            return `"${field.replace(/"/g, '""')}"`;
+        }
+        return field;
+    };
+
     const csvContent = [
         headers.join(','),
         ...filteredResults.value.map(result => [
-            result.studentName,
-            result.assessmentTitle,
-            result.courseName,
-            result.score,
+            escapeField(result.studentName),
+            escapeField(result.assessmentTitle),
+            escapeField(result.courseName),
+            escapeField(result.groupName),
+            result.score === 'N/A' || result.score === 'Pending' ? result.score : result.score.toFixed(1),
             formatDate(result.date)
         ].join(','))
     ].join('\n');
@@ -177,44 +245,113 @@ const viewDetail = (id) => {
     router.push(`/assessment/${id}/results`);
 };
 
+// Helper function to get course ID by name
+const getCourseIdByName = (coursesList, courseName) => {
+    const course = coursesList.find(c => c.name === courseName);
+    return course ? course.id : null;
+};
+
 // Fetch data from API
 onMounted(async () => {
     try {
+        loading.value = true;
+
         // Fetch courses for filter dropdown
         const coursesResponse = await courseService.getCourses(true); // teacher courses
         courses.value = coursesResponse.data;
 
-        // We would fetch results from an API endpoint, but for now use mock data
-        // In the future, implement an API endpoint for getting all assessment results
-        results.value = [
-            {
-                id: 1,
-                studentName: 'Alice Johnson',
-                assessmentTitle: 'Web Development Final',
-                courseName: 'Web Development',
-                courseId: 1,
-                score: '8.5',
-                date: '2024-01-15'
-            },
-            {
-                id: 2,
-                studentName: 'Bob Smith',
-                assessmentTitle: 'Database Project',
-                courseName: 'Database Design',
-                courseId: 3,
-                score: '7.2',
-                date: '2024-01-20'
-            },
-            {
-                id: 3,
-                studentName: 'Charlie Davis',
-                assessmentTitle: 'Team Collaboration',
-                courseName: 'Project Management',
-                courseId: 2,
-                score: '9.0',
-                date: '2024-01-10'
+        // Fetch completed assessment data
+        const completedResponse = await assessmentService.getCompletedAssessments();
+
+        // Create an array to store all individual student results
+        const allResults = [];                // Process each assessment
+        for (const assessment of completedResponse.data) {
+            console.log('Processing assessment:', assessment); // Debug
+
+            // Determine course ID for this assessment
+            const courseId = getCourseIdByName(courses.value, assessment.courseName);
+
+            // Get detailed results for this assessment to fetch individual student data
+            try {
+                const detailResponse = await assessmentService.getAssessmentResults(assessment.id);
+                const detailData = detailResponse.data;
+
+                // Get the group ID for this assessment - first try the assessment data itself
+                let groupId = null;
+
+                // Check both directly and in detailData for the group ID
+                if (assessment.group_id) {
+                    groupId = assessment.group_id;
+                } else if (detailData && detailData.group_id) {
+                    groupId = detailData.group_id;
+                }
+
+                // If we couldn't find the group ID from data we have, find groups for this course
+                // and match by name if possible
+                if (!groupId && courseId && assessment.groupName) {
+                    try {
+                        const groupsResponse = await groupService.getGroups(courseId);
+                        const matchingGroup = groupsResponse.data.find(g => g.name === assessment.groupName);
+                        if (matchingGroup) {
+                            groupId = matchingGroup.id;
+                        }
+                    } catch (groupError) {
+                        console.error('Error fetching groups for course:', groupError);
+                    }
+                }
+
+                if (detailData.results && Array.isArray(detailData.results)) {
+                    // This is a teacher view with individual student results
+                    detailData.results.forEach(studentResult => {
+                        // Add each student's result as a separate entry
+                        allResults.push({
+                            id: assessment.id,
+                            studentId: studentResult.student.id,
+                            studentName: `${studentResult.student.firstName} ${studentResult.student.lastName}`,
+                            studentQNumber: studentResult.student.qNumber,
+                            assessmentTitle: detailData.title,
+                            courseName: assessment.courseName,
+                            courseId: courseId,
+                            groupName: assessment.groupName,
+                            groupId: groupId,
+                            // Format the score correctly - it comes as a string like "8.5"
+                            score: studentResult.overallAverage !== 'N/A' ? parseFloat(studentResult.overallAverage) : 'N/A',
+                            date: assessment.dueDate
+                        });
+                    });
+                } else {
+                    // Fallback if detailed results aren't available as expected
+                    allResults.push({
+                        id: assessment.id,
+                        studentName: assessment.studentsCount > 1 ? `${assessment.studentsCount} students` : "1 student",
+                        assessmentTitle: assessment.title,
+                        courseName: assessment.courseName,
+                        courseId: courseId,
+                        groupName: assessment.groupName,
+                        groupId: groupId,
+                        score: 'N/A',
+                        date: assessment.dueDate
+                    });
+                }
+            } catch (error) {
+                console.error(`Error fetching details for assessment ${assessment.id}:`, error);
+
+                // Add minimal data if we couldn't fetch details
+                allResults.push({
+                    id: assessment.id,
+                    studentName: assessment.studentsCount > 1 ? `${assessment.studentsCount} students` : "1 student",
+                    assessmentTitle: assessment.title,
+                    courseName: assessment.courseName,
+                    courseId: courseId,
+                    groupName: assessment.groupName,
+                    groupId: null,
+                    score: 'N/A',
+                    date: assessment.dueDate
+                });
             }
-        ];
+        }
+
+        results.value = allResults;
     } catch (error) {
         console.error('Error loading results data:', error);
     } finally {
@@ -344,6 +481,11 @@ td {
 .score.needs-improvement {
     background-color: #f8d7da;
     color: #721c24;
+}
+
+.score.pending {
+    background-color: #e2e3e5;
+    color: #383d41;
 }
 
 .icon-button {
