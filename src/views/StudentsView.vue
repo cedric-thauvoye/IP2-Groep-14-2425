@@ -125,6 +125,76 @@
           </div>
         </div>
       </div>
+
+      <!-- Add Student Modal -->
+      <div v-if="showAddStudentModal" class="modal-overlay">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>Add Student</h2>
+            <button class="close-button" @click="showAddStudentModal = false">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <div class="modal-body">
+            <form @submit.prevent="addStudent">
+              <div class="form-group">
+                <label for="new-first-name">First Name</label>
+                <input
+                  type="text"
+                  id="new-first-name"
+                  v-model="newStudent.first_name"
+                  required
+                >
+              </div>
+              <div class="form-group">
+                <label for="new-last-name">Last Name</label>
+                <input
+                  type="text"
+                  id="new-last-name"
+                  v-model="newStudent.last_name"
+                  required
+                >
+              </div>
+              <div class="form-group">
+                <label for="new-email">Email</label>
+                <input
+                  type="email"
+                  id="new-email"
+                  v-model="newStudent.email"
+                  required
+                >
+              </div>
+              <div class="form-group">
+                <label for="new-q-number">Q-Number</label>
+                <input
+                  type="text"
+                  id="new-q-number"
+                  v-model="newStudent.q_number"
+                  required
+                >
+              </div>
+              <div class="form-group">
+                <label for="new-password">Password</label>
+                <input
+                  type="password"
+                  id="new-password"
+                  v-model="newStudent.password"
+                  required
+                >
+              </div>
+              <div class="form-actions">
+                <button type="button" class="cancel-button" @click="showAddStudentModal = false">
+                  Cancel
+                </button>
+                <button type="submit" class="save-button" :disabled="isAddingStudent">
+                  <i v-if="isAddingStudent" class="fas fa-spinner fa-spin"></i>
+                  <span v-else>Add Student</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
     </div>
   </PageLayout>
 </template>
@@ -144,6 +214,15 @@ const filteredStudents = ref([]);
 const showAddStudentModal = ref(false);
 const showEditStudentModal = ref(false);
 const editingStudent = ref(null);
+const newStudent = ref({
+  first_name: '',
+  last_name: '',
+  email: '',
+  q_number: '',
+  password: '',
+  role: 'student'
+});
+const isAddingStudent = ref(false);
 
 // Get all students
 const fetchStudents = async () => {
@@ -205,6 +284,33 @@ const saveEditedStudent = async () => {
   } catch (error) {
     console.error('Error updating student:', error);
     alert('Failed to update student. Please try again.');
+  }
+};
+
+// Add a new student
+const addStudent = async () => {
+  isAddingStudent.value = true;
+  try {
+    await userService.createUser(newStudent.value);
+
+    // Reset form and close modal
+    newStudent.value = {
+      first_name: '',
+      last_name: '',
+      email: '',
+      q_number: '',
+      password: '',
+      role: 'student'
+    };
+    showAddStudentModal.value = false;
+
+    // Refresh students list
+    await fetchStudents();
+  } catch (error) {
+    console.error('Error adding student:', error);
+    alert('Failed to add student. Please try again.');
+  } finally {
+    isAddingStudent.value = false;
   }
 };
 
