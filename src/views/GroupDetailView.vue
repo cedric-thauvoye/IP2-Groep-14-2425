@@ -322,6 +322,35 @@
           </div>
         </div>
       </div>
+
+      <!-- Delete Confirmation Modal -->
+      <div v-if="showDeleteModal" class="modal-overlay show">
+        <div class="modal-content confirmation-modal">
+          <div class="modal-header">
+            <h2>Confirm Deletion</h2>
+            <button class="close-button" @click="showDeleteModal = false">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="warning-icon">
+              <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <p class="confirmation-text">
+              Are you sure you want to delete the group "{{ group.name }}"?
+            </p>
+            <p class="permanent-note">This action cannot be undone.</p>
+            <div class="action-buttons">
+              <button class="cancel-button" @click="showDeleteModal = false">
+                Cancel
+              </button>
+              <button class="delete-button" @click="deleteGroup">
+                Delete Group
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </PageLayout>
 </template>
@@ -362,6 +391,7 @@ const newAssessment = ref({
     }
   ]
 });
+const showDeleteModal = ref(false);
 
 // Format date function
 const formatDate = (dateString) => {
@@ -404,19 +434,18 @@ const saveEditedGroup = async () => {
 
 // Delete group functionality
 const confirmDeleteGroup = () => {
-  if (confirm(`Are you sure you want to delete the group "${group.value.name}"?`)) {
-    deleteGroup();
-  }
+  showDeleteModal.value = true;
 };
 
 const deleteGroup = async () => {
   try {
     await groupService.deleteGroup(group.value.id);
-    // Redirect to groups page after successful deletion
     router.push('/groups');
   } catch (err) {
     console.error('Error deleting group:', err);
     error.value = 'Failed to delete group. Please try again.';
+  } finally {
+    showDeleteModal.value = false;
   }
 };
 
@@ -977,6 +1006,87 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.confirmation-modal {
+  max-width: 450px;
+}
+
+.warning-icon {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.warning-icon i {
+  color: #e74c3c;
+  font-size: 3rem;
+}
+
+.confirmation-text {
+  font-size: 1.1rem;
+  color: #2c3e50;
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.permanent-note {
+  color: #7f8c8d;
+  font-size: 0.9rem;
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.action-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.cancel-button {
+  background-color: #95a5a6;
+}
+
+.delete-button {
+  background-color: #e74c3c;
+}
+
+.cancel-button, .delete-button {
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.2s;
+}
+
+.cancel-button:hover {
+  background-color: #7f8c8d;
+}
+
+.delete-button:hover {
+  background-color: #c0392b;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: #7f8c8d;
+  transition: color 0.2s;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+}
+
+.close-button:hover {
+  color: #e74c3c;
+  background-color: #f8f9fa;
 }
 
 @media (max-width: 992px) {

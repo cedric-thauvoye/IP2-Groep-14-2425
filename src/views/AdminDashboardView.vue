@@ -487,7 +487,7 @@
       </div>
 
       <!-- Delete Confirmation Modal -->
-      <div v-if="showDeleteModal" class="modal-overlay">
+      <div v-if="showDeleteModal" class="modal-overlay show">
         <div class="modal-content confirmation-modal">
           <div class="modal-header">
             <h2>Confirm Deletion</h2>
@@ -1319,6 +1319,132 @@ onMounted(() => {
 .confirm-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Confirmation modal styles */
+.confirmation-modal {
+  max-width: 450px;
+}
+
+.confirmation-modal .modal-header {
+  background: #f8f9fa;
+}
+
+.confirmation-modal .modal-body {
+  padding: 2rem;
+  text-align: center;
+}
+
+.warning-icon {
+  color: #e74c3c;
+  font-size: 3rem;
+  margin-bottom: 1.5rem;
+}
+
+.confirmation-text {
+  font-size: 1.1rem;
+  color: #2c3e50;
+  margin-bottom: 0.5rem;
+}
+
+.permanent-note {
+  color: #7f8c8d;
+  font-size: 0.9rem;
+  margin-bottom: 2rem;
+}
+
+.security-verification {
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 8px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+}
+
+.security-verification label {
+  display: block;
+  margin-bottom: 0.75rem;
+  color: #2c3e50;
+  font-weight: 500;
+}
+
+.security-verification input {
+  width: calc(100% - 1.5rem);
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  margin: 0 auto;
+}
+
+.security-verification input:focus {
+  border-color: #3498db;
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.1);
+  outline: none;
+}
+
+.modal-footer {
+  padding: 1rem 1.5rem;
+  background: #f8f9fa;
+  border-top: 1px solid #eee;
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+}
+
+.modal-footer .cancel-button {
+  background: white;
+  border: 1px solid #ddd;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  color: #2c3e50;
+  transition: all 0.2s ease;
+}
+
+.modal-footer .cancel-button:hover {
+  background: #f8f9fa;
+  border-color: #c8c9ca;
+}
+
+.modal-footer .confirm-button {
+  background: #e74c3c;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+}
+
+.modal-footer .confirm-button:hover:not(:disabled) {
+  background: #c0392b;
+}
+
+.modal-footer .confirm-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Add smooth transition for modal */
+.modal-overlay {
+  transition: all 0.2s ease;
+  opacity: 1;
+}
+
+.modal-content {
+  transition: all 0.2s ease;
+  transform: translateY(0);
+}
+
+.modal-overlay.show {
+  opacity: 1;
+}
+
+.modal-overlay.show .modal-content {
+  transform: translateY(0);
 }
 
 /* Responsive adjustments */

@@ -398,6 +398,35 @@
             </div>
           </div>
         </div>
+
+        <!-- Delete Confirmation Modal -->
+        <div v-if="showDeleteModal" class="modal-overlay show">
+          <div class="modal-content confirmation-modal">
+            <div class="modal-header">
+              <h2>Confirm Deletion</h2>
+              <button class="close-button" @click="showDeleteModal = false">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+            <div class="modal-body">
+              <div class="warning-icon">
+                <i class="fas fa-exclamation-triangle"></i>
+              </div>
+              <p class="confirmation-text">
+                Are you sure you want to delete the course "{{ course.name }}"?
+              </p>
+              <p class="permanent-note">This action cannot be undone.</p>
+              <div class="action-buttons">
+                <button class="cancel-button" @click="showDeleteModal = false">
+                  Cancel
+                </button>
+                <button class="delete-button" @click="deleteCourse">
+                  Delete Course
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </template>
     </div>
   </PageLayout>
@@ -431,6 +460,7 @@ const loadingStudents = ref(false);
 const newGroup = ref({ name: '', studentIds: [] });
 const groupStudentSearch = ref('');
 const isCreatingGroup = ref(false);
+const showDeleteModal = ref(false);
 
 // Get initials for avatar
 const getInitials = (firstName, lastName) => {
@@ -565,19 +595,18 @@ const saveEditedCourse = async () => {
 
 // Delete course
 const confirmDeleteCourse = () => {
-  if (confirm(`Are you sure you want to delete the course "${course.value.name}"?`)) {
-    deleteCourse();
-  }
+  showDeleteModal.value = true;
 };
 
 const deleteCourse = async () => {
   try {
-    // await courseService.deleteCourse(course.value.id);
-    console.log('Deleting course:', course.value.id);
+    await courseService.deleteCourse(course.value.id);
     router.push('/courses');
   } catch (err) {
     console.error('Error deleting course:', err);
     error.value = 'Failed to delete course. Please try again.';
+  } finally {
+    showDeleteModal.value = false;
   }
 };
 
@@ -1184,6 +1213,87 @@ onMounted(async () => {
 .no-students-message {
   color: #7f8c8d;
   font-style: italic;
+}
+
+.confirmation-modal {
+  max-width: 450px;
+}
+
+.warning-icon {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.warning-icon i {
+  color: #e74c3c;
+  font-size: 3rem;
+}
+
+.confirmation-text {
+  font-size: 1.1rem;
+  color: #2c3e50;
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.permanent-note {
+  color: #7f8c8d;
+  font-size: 0.9rem;
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.action-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.cancel-button {
+  background-color: #95a5a6;
+}
+
+.delete-button {
+  background-color: #e74c3c;
+}
+
+.cancel-button, .delete-button {
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.2s;
+}
+
+.cancel-button:hover {
+  background-color: #7f8c8d;
+}
+
+.delete-button:hover {
+  background-color: #c0392b;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: #7f8c8d;
+  transition: color 0.2s;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+}
+
+.close-button:hover {
+  color: #e74c3c;
+  background-color: #f8f9fa;
 }
 
 @media (max-width: 992px) {
