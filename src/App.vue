@@ -1,10 +1,12 @@
 <template>
 	<router-view></router-view>
+	<NotificationContainer />
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue';
 import { authService } from './services/api';
+import NotificationContainer from './components/Common/NotificationContainer.vue';
 
 const user = ref(null);
 

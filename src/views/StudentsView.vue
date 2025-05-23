@@ -204,6 +204,7 @@ import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
 import { userService, authService } from '../services/api';
+import notificationStore from '../stores/notificationStore';
 
 const router = useRouter();
 const students = ref([]);
@@ -281,9 +282,10 @@ const saveEditedStudent = async () => {
 
     showEditStudentModal.value = false;
     editingStudent.value = null;
+    notificationStore.success('Student information updated successfully.');
   } catch (error) {
     console.error('Error updating student:', error);
-    alert('Failed to update student. Please try again.');
+    notificationStore.error('Failed to update student. Please try again.');
   }
 };
 
@@ -306,9 +308,10 @@ const addStudent = async () => {
 
     // Refresh students list
     await fetchStudents();
+    notificationStore.success('Student added successfully.');
   } catch (error) {
     console.error('Error adding student:', error);
-    alert('Failed to add student. Please try again.');
+    notificationStore.error('Failed to add student. Please try again.');
   } finally {
     isAddingStudent.value = false;
   }

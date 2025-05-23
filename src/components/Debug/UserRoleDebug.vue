@@ -16,6 +16,7 @@
 <script setup>
 import { ref } from 'vue';
 import { authService } from '../../services/api';
+import notificationStore from '../../stores/notificationStore';
 
 const roleInfo = ref(null);
 const hasToken = ref(false);
@@ -50,7 +51,7 @@ const makeAdmin = () => {
 
     // In a real app, you'd need to get a new token from the server
     // This is just a client-side trick for debugging
-    alert('For debugging: User role changed to admin in local token. This is a client-side change only.');
+    notificationStore.warning('For debugging: User role changed to admin in local token. This is a client-side change only.');
     console.log('Modified payload:', payload);
 
     // Force a page reload to apply the change

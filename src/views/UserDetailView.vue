@@ -8,7 +8,11 @@
 
       <div v-else-if="error" class="error-state">
         <i class="fas fa-exclamation-triangle"></i>
-        <p>{{ error }}</p>
+  import { ref, computed, onMounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import PageLayout from '../components/Layout/PageLayout.vue';
+import { authService, userService, courseService } from '../services/api';
+import notificationStore from '../stores/notificationStore';  <p>{{ error }}</p>
         <button class="back-button" @click="goBack">
           Back
         </button>
@@ -420,7 +424,7 @@ const resetPassword = async () => {
     // First verify admin password
     const verification = await authService.verifyPassword(passwordForm.value.adminPassword);
     if (!verification.data.valid) {
-      alert('Incorrect password. Password reset cancelled.');
+      notificationStore.error('Incorrect password. Password reset cancelled.');
       return;
     }
 
@@ -428,7 +432,7 @@ const resetPassword = async () => {
       password: passwordForm.value.password
     });
 
-    alert('Password has been reset successfully.');
+    notificationStore.success('Password has been reset successfully.');
     showResetPasswordModal.value = false;
     passwordForm.value = {
       password: '',
@@ -453,12 +457,12 @@ const deleteUser = async () => {
     // Verify admin password first
     const verification = await authService.verifyPassword(deletePassword.value);
     if (!verification.data.valid) {
-      alert('Incorrect password. Delete operation cancelled.');
+      notificationStore.error('Incorrect password. Delete operation cancelled.');
       return;
     }
 
     await userService.deleteUser(user.value.id);
-    alert('User has been deleted successfully.');
+    notificationStore.success('User has been deleted successfully.');
     router.push('/admin');
   } catch (err) {
     console.error('Error deleting user:', err);

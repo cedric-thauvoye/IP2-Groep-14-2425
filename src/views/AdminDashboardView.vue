@@ -535,6 +535,7 @@ import { useRouter } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
 import { courseService, groupService, authService, userService } from '../services/api';
 import UserRoleDebug from '../components/Debug/UserRoleDebug.vue';
+import notificationStore from '../stores/notificationStore';
 
 const router = useRouter();
 const activeTab = ref('overview');
@@ -766,7 +767,7 @@ const performDelete = async () => {
     // Verify admin password first
     const verification = await authService.verifyPassword(adminPassword.value);
     if (!verification.data.valid) {
-      alert('Incorrect password. Delete operation cancelled.');
+      notificationStore.error('Incorrect password. Delete operation cancelled.');
       return;
     }
 
@@ -789,6 +790,9 @@ const performDelete = async () => {
         break;
     }
 
+    // Store the type before clearing state
+    const deletedType = deleteType.value;
+
     // Reset and close modal
     showDeleteModal.value = false;
     deleteObject.value = null;
@@ -798,9 +802,10 @@ const performDelete = async () => {
 
     // Update stats after deletion
     fetchStats();
+    notificationStore.success(`${deletedType} was successfully deleted.`);
   } catch (error) {
     console.error('Error performing delete:', error);
-    alert(`Error deleting ${deleteType.value}: ${error.message}`);
+    notificationStore.error(`Error deleting ${deleteType.value}: ${error.message}`);
   }
 };
 
