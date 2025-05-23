@@ -153,7 +153,7 @@
                   <button class="icon-button" @click="editGroup(group.id)">
                     <i class="fas fa-edit"></i>
                   </button>
-                  <button class="icon-button delete" @click="deleteGroup(group.id)">
+                  <button class="icon-button delete" @click="confirmDeleteGroup(group.id)">
                     <i class="fas fa-trash"></i>
                   </button>
                 </div>
@@ -427,6 +427,93 @@
             </div>
           </div>
         </div>
+
+        <!-- Delete Group Confirmation Modal -->
+        <div v-if="showGroupDeleteModal" class="modal-overlay show">
+          <div class="modal-content confirmation-modal">
+            <div class="modal-header">
+              <h2>Confirm Group Deletion</h2>
+              <button class="close-button" @click="showGroupDeleteModal = false">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+            <div class="modal-body">
+              <div class="warning-icon">
+                <i class="fas fa-exclamation-triangle"></i>
+              </div>
+              <p class="confirmation-text">
+                Are you sure you want to delete this group?
+              </p>
+              <p class="permanent-note">This action cannot be undone.</p>
+              <div class="action-buttons">
+                <button class="cancel-button" @click="showGroupDeleteModal = false">
+                  Cancel
+                </button>
+                <button class="delete-button" @click="deleteGroup">
+                  Delete Group
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Delete Teacher Confirmation Modal -->
+        <div v-if="showTeacherDeleteModal" class="modal-overlay show">
+          <div class="modal-content confirmation-modal">
+            <div class="modal-header">
+              <h2>Confirm Teacher Removal</h2>
+              <button class="close-button" @click="showTeacherDeleteModal = false">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+            <div class="modal-body">
+              <div class="warning-icon">
+                <i class="fas fa-exclamation-triangle"></i>
+              </div>
+              <p class="confirmation-text">
+                Are you sure you want to remove this teacher from the course?
+              </p>
+              <p class="permanent-note">This action cannot be undone.</p>
+              <div class="action-buttons">
+                <button class="cancel-button" @click="showTeacherDeleteModal = false">
+                  Cancel
+                </button>
+                <button class="delete-button" @click="handleTeacherRemoval">
+                  Remove Teacher
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Delete Student Confirmation Modal -->
+        <div v-if="showStudentDeleteModal" class="modal-overlay show">
+          <div class="modal-content confirmation-modal">
+            <div class="modal-header">
+              <h2>Confirm Student Removal</h2>
+              <button class="close-button" @click="showStudentDeleteModal = false">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+            <div class="modal-body">
+              <div class="warning-icon">
+                <i class="fas fa-exclamation-triangle"></i>
+              </div>
+              <p class="confirmation-text">
+                Are you sure you want to remove this student from the course?
+              </p>
+              <p class="permanent-note">This action cannot be undone.</p>
+              <div class="action-buttons">
+                <button class="cancel-button" @click="showStudentDeleteModal = false">
+                  Cancel
+                </button>
+                <button class="delete-button" @click="handleStudentRemoval">
+                  Remove Student
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </template>
     </div>
   </PageLayout>
@@ -461,6 +548,12 @@ const newGroup = ref({ name: '', studentIds: [] });
 const groupStudentSearch = ref('');
 const isCreatingGroup = ref(false);
 const showDeleteModal = ref(false);
+const showGroupDeleteModal = ref(false);
+const groupToDelete = ref(null);
+const showTeacherDeleteModal = ref(false);
+const teacherToDelete = ref(null);
+const showStudentDeleteModal = ref(false);
+const studentToDelete = ref(null);
 
 // Get initials for avatar
 const getInitials = (firstName, lastName) => {
@@ -611,28 +704,38 @@ const deleteCourse = async () => {
 };
 
 // Add and remove teachers
-const removeTeacher = async (teacherId) => {
-  if (confirm('Are you sure you want to remove this teacher from the course?')) {
-    try {
-      await courseService.removeTeacherFromCourse(course.value.id, teacherId);
-      fetchCourseDetails();
-    } catch (err) {
-      console.error('Error removing teacher:', err);
-      error.value = 'Failed to remove teacher. Please try again.';
-    }
+const removeTeacher = (teacherId) => {
+  teacherToDelete.value = teacherId;
+  showTeacherDeleteModal.value = true;
+};
+
+const handleTeacherRemoval = async () => {
+  try {
+    await courseService.removeTeacherFromCourse(course.value.id, teacherToDelete.value);
+    showTeacherDeleteModal.value = false;
+    teacherToDelete.value = null;
+    fetchCourseDetails();
+  } catch (err) {
+    console.error('Error removing teacher:', err);
+    error.value = 'Failed to remove teacher. Please try again.';
   }
 };
 
 // Add and remove students
-const removeStudent = async (studentId) => {
-  if (confirm('Are you sure you want to remove this student from the course?')) {
-    try {
-      await courseService.removeStudentFromCourse(course.value.id, studentId);
-      fetchCourseDetails();
-    } catch (err) {
-      console.error('Error removing student:', err);
-      error.value = 'Failed to remove student. Please try again.';
-    }
+const removeStudent = (studentId) => {
+  studentToDelete.value = studentId;
+  showStudentDeleteModal.value = true;
+};
+
+const handleStudentRemoval = async () => {
+  try {
+    await courseService.removeStudentFromCourse(course.value.id, studentToDelete.value);
+    showStudentDeleteModal.value = false;
+    studentToDelete.value = null;
+    fetchCourseDetails();
+  } catch (err) {
+    console.error('Error removing student:', err);
+    error.value = 'Failed to remove student. Please try again.';
   }
 };
 
@@ -651,15 +754,21 @@ const editGroup = (groupId) => {
   console.log('Edit group:', groupId);
 };
 
+const confirmDeleteGroup = (groupId) => {
+  const group = course.value.groups.find(g => g.id === groupId);
+  groupToDelete.value = group;
+  showGroupDeleteModal.value = true;
+};
+
 const deleteGroup = async (groupId) => {
-  if (confirm('Are you sure you want to delete this group?')) {
-    try {
-      await groupService.deleteGroup(groupId);
-      fetchCourseDetails();
-    } catch (err) {
-      console.error('Error deleting group:', err);
-      error.value = 'Failed to delete group. Please try again.';
-    }
+  try {
+    await groupService.deleteGroup(groupId);
+    showGroupDeleteModal.value = false;
+    groupToDelete.value = null;
+    fetchCourseDetails();
+  } catch (err) {
+    console.error('Error deleting group:', err);
+    error.value = 'Failed to delete group. Please try again.';
   }
 };
 
