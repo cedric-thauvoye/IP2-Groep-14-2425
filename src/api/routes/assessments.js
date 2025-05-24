@@ -338,14 +338,14 @@ module.exports = (pool) => {
         return res.status(403).json({ message: 'Only teachers can create assessments' });
       }
 
-      const { title, description, courseId, groupId, dueDate, criteria } = req.body;
+      const { title, description, courseId, groupIds, dueDate, criteria } = req.body;
 
       // Log the incoming data for debugging
       console.log('Creating assessment with data:', JSON.stringify({
         title,
         description,
         courseId,
-        groupId,
+        groupIds,
         dueDate,
         criteriaCount: criteria ? criteria.length : 0
       }));
@@ -354,7 +354,7 @@ module.exports = (pool) => {
         console.log('First criterion sample:', JSON.stringify(criteria[0]));
       }
 
-      if (!title || !courseId || !groupId || !dueDate || !criteria || !criteria.length) {
+      if (!title || !courseId || !groupIds || !dueDate || !criteria || !criteria.length || !Array.isArray(groupIds)) {
         return res.status(400).json({ message: 'Missing required fields' });
       }
 
@@ -363,44 +363,45 @@ module.exports = (pool) => {
 
       try {
         // Format the date correctly for MySQL
-        // Extract only the YYYY-MM-DD HH:MM:SS part that MySQL can understand
         const formattedDueDate = new Date(dueDate).toISOString().slice(0, 19).replace('T', ' ');
 
-        console.log('Executing SQL to create assessment with formatted due date:', formattedDueDate);
-        const [assessmentResult] = await conn.execute(
-          'INSERT INTO assessments (title, description, course_id, group_id, teacher_id, due_date) VALUES (?, ?, ?, ?, ?, ?)',
-          [title, description || '', courseId, groupId, req.user.id, formattedDueDate]
-        );
+        // Create one assessment for each group
+        const assessmentIds = [];
+        for (const groupId of groupIds) {
+          // Insert assessment
+          const [assessmentResult] = await conn.execute(
+            'INSERT INTO assessments (title, description, course_id, group_id, teacher_id, due_date) VALUES (?, ?, ?, ?, ?, ?)',
+            [title, description || '', courseId, groupId, req.user.id, formattedDueDate]
+          );
 
-        const assessmentId = assessmentResult.insertId;
-        console.log('Assessment created with ID:', assessmentId);
+          const assessmentId = assessmentResult.insertId;
+          assessmentIds.push(assessmentId);
 
-        // Create criteria
-        for (const criterion of criteria) {
-          console.log('Adding criterion:', JSON.stringify(criterion));
-          try {
-            // Convert minScore and maxScore to numbers to ensure proper database type handling
-            const minScore = parseFloat(criterion.minScore);
-            const maxScore = parseFloat(criterion.maxScore);
+          // Create criteria for this assessment
+          for (const criterion of criteria) {
+            try {
+              // Convert minScore and maxScore to numbers
+              const minScore = parseFloat(criterion.minScore);
+              const maxScore = parseFloat(criterion.maxScore);
 
-            // Validate the scores
-            if (isNaN(minScore) || isNaN(maxScore)) {
-              throw new Error('Invalid score values. Min and max scores must be numbers.');
+              if (isNaN(minScore) || isNaN(maxScore)) {
+                throw new Error('Invalid score values. Min and max scores must be numbers.');
+              }
+
+              await conn.execute(
+                'INSERT INTO assessment_criteria (assessment_id, name, description, min_score, max_score) VALUES (?, ?, ?, ?, ?)',
+                [
+                  assessmentId,
+                  criterion.name,
+                  criterion.description || '',
+                  minScore,
+                  maxScore
+                ]
+              );
+            } catch (criterionError) {
+              console.error('Error adding criterion:', criterionError);
+              throw criterionError;
             }
-
-            await conn.execute(
-              'INSERT INTO assessment_criteria (assessment_id, name, description, min_score, max_score) VALUES (?, ?, ?, ?, ?)',
-              [
-                assessmentId,
-                criterion.name,
-                criterion.description || '',
-                minScore,
-                maxScore
-              ]
-            );
-          } catch (criterionError) {
-            console.error('Error adding criterion:', criterionError);
-            throw criterionError;
           }
         }
 
@@ -409,8 +410,8 @@ module.exports = (pool) => {
         conn.release();
 
         res.status(201).json({
-          message: 'Assessment created successfully',
-          assessmentId
+          message: 'Assessments created successfully',
+          assessmentIds
         });
       } catch (error) {
         console.error('Transaction error during assessment creation:', error);

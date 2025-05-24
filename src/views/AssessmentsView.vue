@@ -140,18 +140,32 @@
                             </div>
 
                             <div class="form-group">
-                                <label for="group">Group *</label>
-                                <select
-                                    id="group"
-                                    v-model="newAssessment.groupId"
-                                    required
-                                    :disabled="!newAssessment.courseId"
-                                >
-                                    <option value="" disabled>Select a group</option>
-                                    <option v-for="group in groups" :key="group.id" :value="group.id">
-                                        {{ group.name }}
-                                    </option>
-                                </select>
+                                <label>Groups</label>
+                                <div class="groups-selection">
+                                    <button type="button" class="select-all-button" @click="toggleAllGroups">
+                                        {{ newAssessment.groupIds.length === groups.length ? 'Deselect All' : 'Select All Groups' }}
+                                    </button>
+
+                                    <div class="groups-grid" v-if="groups.length > 0">
+                                        <div v-for="group in groups" :key="group.id" class="group-checkbox">
+                                            <input
+                                                type="checkbox"
+                                                :id="'group-' + group.id"
+                                                :value="group.id"
+                                                v-model="newAssessment.groupIds"
+                                            >
+                                            <label :for="'group-' + group.id">{{ group.name }}</label>
+                                        </div>
+                                    </div>
+                                    <div v-else>
+                                        <p v-if="newAssessment.courseId" class="no-groups">
+                                            No groups available in this course
+                                        </p>
+                                        <p v-else class="select-course-hint">
+                                            Select a course to view available groups
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="form-group">
@@ -266,7 +280,7 @@ const newAssessment = ref({
     title: '',
     description: '',
     courseId: '',
-    groupId: '',
+    groupIds: [],  // Changed from groupId to groupIds array
     dueDate: '',
     criteria: [
         {
@@ -282,7 +296,6 @@ const isFormValid = computed(() => {
     return newAssessment.value.title &&
            newAssessment.value.description &&
            newAssessment.value.courseId &&
-           newAssessment.value.groupId &&
            newAssessment.value.dueDate &&
            newAssessment.value.criteria.length > 0 &&
            newAssessment.value.criteria.every(c =>
@@ -321,7 +334,7 @@ const loadGroups = async () => {
 
         const { data } = await groupService.getGroups(newAssessment.value.courseId);
         groups.value = data;
-        newAssessment.value.groupId = ''; // Reset selected group
+        newAssessment.value.groupIds = []; // Reset selected groups
     } catch (error) {
         console.error('Error loading groups:', error);
     }
@@ -359,7 +372,7 @@ const createAssessment = async () => {
             title: '',
             description: '',
             courseId: '',
-            groupId: '',
+            groupIds: [],
             dueDate: '',
             criteria: [
                 {
@@ -382,6 +395,15 @@ const createAssessment = async () => {
         // You could add error handling UI here
     } finally {
         isSubmitting.value = false;
+    }
+};
+
+// Add function to toggle all groups selection
+const toggleAllGroups = () => {
+    if (newAssessment.value.groupIds.length === groups.value.length) {
+        newAssessment.value.groupIds = [];
+    } else {
+        newAssessment.value.groupIds = groups.value.map(g => g.id);
     }
 };
 
@@ -418,6 +440,164 @@ onMounted(async () => {
 .assessments-container {
     max-width: 1200px;
     margin: 0 auto;
+}
+
+/* Modal Layout */
+.modal-content {
+    background-color: white;
+    border-radius: 10px;
+    width: 90%;
+    max-width: 800px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.modal-body {
+    padding: 2rem;
+}
+
+/* Form Elements */
+.form-group {
+    margin-bottom: 1.5rem;
+    max-width: 100%;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 1rem;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+/* Groups Selection */
+.groups-selection {
+    border: 1px solid #e1e1e1;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-top: 0.5rem;
+    background-color: #f8f9fa;
+}
+
+.select-all-button {
+    background-color: #fff;
+    border: 1px solid #3498db;
+    color: #3498db;
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.5rem;
+    cursor: pointer;
+    width: 100%;
+    max-width: 200px;
+    text-align: center;
+    transition: all 0.2s ease;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.select-all-button:hover {
+    background-color: #3498db;
+    color: white;
+}
+
+.groups-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1rem;
+    justify-content: center;
+    padding: 0 0.5rem;
+}
+
+.group-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background-color: white;
+    border: 1px solid #e1e1e1;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.group-checkbox:hover {
+    border-color: #3498db;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.group-checkbox input[type="checkbox"] {
+    margin: 0;
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.group-checkbox label {
+    margin: 0;
+    cursor: pointer;
+    font-size: 0.95rem;
+    color: #2c3e50;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.no-groups, .select-course-hint {
+    text-align: center;
+    color: #6c757d;
+    margin: 2rem 0;
+    font-style: italic;
+}
+
+/* Assessment Criteria */
+.criterion-item {
+    background-color: white;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border-radius: 8px;
+    border: 1px solid #e1e1e1;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.scores-range {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.scores-range .form-group {
+    margin-bottom: 0;
+}
+
+.scores-range input {
+    width: 100%;
+}
+
+/* Responsive Design */
+@media (max-height: 800px) {
+    .modal-content {
+        max-height: 85vh;
+    }
+}
+
+@media (max-width: 768px) {
+    .modal-body {
+        padding: 1.5rem;
+    }
+
+    .groups-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    }
+
+    .scores-range {
+        grid-template-columns: 1fr;
+    }
 }
 
 .header {
@@ -585,7 +765,7 @@ onMounted(async () => {
     background-color: white;
     border-radius: 10px;
     width: 90%;
-    max-width: 700px;
+    max-width: 800px;  /* Increased from 700px for better spacing */
     max-height: 90vh;
     overflow-y: auto;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
@@ -613,11 +793,12 @@ onMounted(async () => {
 }
 
 .modal-body {
-    padding: 1.5rem;
+    padding: 2rem;  /* Increased padding */
 }
 
 .form-group {
     margin-bottom: 1.5rem;
+    max-width: 100%;  /* Ensure form groups don't overflow */
 }
 
 .form-group label {
@@ -635,6 +816,8 @@ onMounted(async () => {
     border: 1px solid #ddd;
     border-radius: 6px;
     font-size: 1rem;
+    max-width: 100%;  /* Prevent overflow */
+    box-sizing: border-box;  /* Include padding in width calculation */
 }
 
 .form-group textarea {
@@ -653,9 +836,10 @@ onMounted(async () => {
 .criterion-item {
     background-color: white;
     padding: 1.5rem;
-    margin-bottom: 1rem;
-    border-radius: 6px;
+    margin-bottom: 1.5rem;
+    border-radius: 8px;
     border: 1px solid #e1e1e1;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .criterion-header {
@@ -678,18 +862,17 @@ onMounted(async () => {
 }
 
 .scores-range {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 1rem;
 }
 
 .scores-range .form-group {
-    flex: 1;
+    margin-bottom: 0;
 }
 
-.hint {
-    color: #7f8c8d;
-    margin-bottom: 1rem;
-    font-style: italic;
+.scores-range input {
+    width: 100%;
 }
 
 .add-criterion-button {
@@ -735,25 +918,105 @@ onMounted(async () => {
     cursor: not-allowed;
 }
 
+.groups-selection {
+    border: 1px solid #e1e1e1;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-top: 0.5rem;
+    background-color: #f8f9fa;
+}
+
+.select-all-button {
+    background-color: #fff;
+    border: 1px solid #3498db;
+    color: #3498db;
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.5rem;
+    cursor: pointer;
+    width: 100%;
+    max-width: 200px;  /* Limit button width */
+    text-align: center;
+    transition: all 0.2s ease;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.select-all-button:hover {
+    background-color: #3498db;
+    color: white;
+}
+
+.groups-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1rem;
+    justify-content: center;
+    padding: 0 0.5rem;
+}
+
+.group-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background-color: white;
+    border: 1px solid #e1e1e1;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.group-checkbox:hover {
+    border-color: #3498db;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.group-checkbox input[type="checkbox"] {
+    margin: 0;
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.group-checkbox label {
+    margin: 0;
+    cursor: pointer;
+    font-size: 0.95rem;
+    color: #2c3e50;
+    flex: 1;
+    /* Prevent text overflow */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.no-groups, .select-course-hint {
+    text-align: center;
+    color: #6c757d;
+    margin: 2rem 0;
+    font-style: italic;
+}
+
+/* Make sure modal doesn't get too tall */
+@media (max-height: 800px) {
+    .modal-content {
+        max-height: 85vh;
+    }
+}
+
+/* Responsive adjustments */
 @media (max-width: 768px) {
-    .header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 1rem;
+    .modal-body {
+        padding: 1.5rem;
     }
 
-    .assessment-tabs {
-        width: 100%;
-    }
-
-    .tab-button {
-        flex: 1;
-        padding: 0.75rem;
+    .groups-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     }
 
     .scores-range {
-        flex-direction: column;
-        gap: 0;
+        grid-template-columns: 1fr;
     }
 }
 </style>
