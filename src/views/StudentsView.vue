@@ -3,7 +3,7 @@
     <div class="students-container">
       <div class="header">
         <h1>Students</h1>
-        <div class="actions" v-if="isTeacher">
+        <div class="actions" v-if="isAdmin">
           <router-link to="/import" class="action-button">
             <i class="fas fa-file-import"></i> Import Students
           </router-link>
@@ -50,7 +50,7 @@
                   <router-link :to="`/user/${student.id}`" class="view-button">
                     <i class="fas fa-eye"></i>
                   </router-link>
-                  <button v-if="isTeacher" class="edit-button" @click="editStudent(student.id)">
+                  <button v-if="isAdmin" class="edit-button" @click="editStudent(student.id)">
                     <i class="fas fa-edit"></i>
                   </button>
                 </div>
@@ -209,7 +209,7 @@ import notificationStore from '../stores/notificationStore';
 const router = useRouter();
 const students = ref([]);
 const loading = ref(true);
-const isTeacher = ref(false);
+const isAdmin = ref(false);
 const searchQuery = ref('');
 const filteredStudents = ref([]);
 const showAddStudentModal = ref(false);
@@ -250,11 +250,11 @@ const filterStudents = () => {
   });
 };
 
-// Check if user is a teacher
+// Check if user is an admin
 const checkUserRole = async () => {
   try {
     const response = await authService.checkUserRole();
-    isTeacher.value = response.data.role === 'teacher' || response.data.role === 'admin';
+    isAdmin.value = response.data.role === 'admin';
   } catch (error) {
     console.error('Error checking user role:', error);
   }
