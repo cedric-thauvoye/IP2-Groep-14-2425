@@ -51,6 +51,8 @@ export const authService = {
 export const assessmentService = {
   getPendingAssessments: () => apiClient.get('/assessments/pending'),
   getCompletedAssessments: () => apiClient.get('/assessments/completed'),
+  getPendingAssessmentsForTeacher: () => apiClient.get('/assessments/pending?role=teacher'),
+  getCompletedAssessmentsForTeacher: () => apiClient.get('/assessments/completed?role=teacher'),
   getAssessmentById: (id) => apiClient.get(`/assessments/${id}`),
   createAssessment: (assessment) => apiClient.post('/assessments', assessment),
   updateAssessment: (id, assessment) => apiClient.put(`/assessments/${id}`, assessment),

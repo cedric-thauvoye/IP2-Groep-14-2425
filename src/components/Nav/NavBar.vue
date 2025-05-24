@@ -57,7 +57,7 @@
                 <div class="nav-section">
                     <h3>Assessments</h3>
                     <NavOption to="/assessments">
-                        <i class="fas fa-tasks"></i> My Assessments
+                        <i class="fas fa-tasks"></i> {{ isTeacher || isAdmin ? 'Assessments' : 'My Assessments' }}
                     </NavOption>
                     <NavOption to="/results" v-if="isTeacher">
                         <i class="fas fa-chart-bar"></i> Results

@@ -25,11 +25,13 @@ module.exports = (pool) => {
   router.get('/pending', authenticateToken, async (req, res) => {
     try {
       const conn = await pool.getConnection();
+      const { role } = req.query;  // Get role from query parameter
+      const userRole = role || req.user.role;  // Use query role or user's actual role
 
       // Different queries for students and teachers
       let query, params;
 
-      if (req.user.role === 'student') {
+      if (userRole === 'student') {
         // Students see assessments assigned to their groups that they haven't responded to yet
         query = `
           SELECT a.id, a.title, a.description, a.due_date, c.name as courseName,
@@ -110,11 +112,13 @@ module.exports = (pool) => {
   router.get('/completed', authenticateToken, async (req, res) => {
     try {
       const conn = await pool.getConnection();
+      const { role } = req.query;  // Get role from query parameter
+      const userRole = role || req.user.role;  // Use query role or user's actual role
 
       // Different queries for students and teachers
       let query, params;
 
-      if (req.user.role === 'student') {
+      if (userRole === 'student') {
         // Students see assessments they've completed
         query = `
           SELECT a.id, a.title, a.description, c.name as courseName,
