@@ -399,6 +399,39 @@
           </div>
         </div>
 
+        <!-- Edit Group Modal -->
+        <div v-if="showEditGroupModal && editingGroup" class="modal-overlay">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h2>Edit Group</h2>
+              <button class="close-button" @click="showEditGroupModal = false">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+            <div class="modal-body">
+              <form @submit.prevent="saveEditedGroup">
+                <div class="form-group">
+                  <label for="group-name">Group Name</label>
+                  <input
+                    type="text"
+                    id="group-name"
+                    v-model="editingGroup.name"
+                    required
+                  >
+                </div>
+                <div class="form-actions">
+                  <button type="button" class="cancel-button" @click="showEditGroupModal = false">
+                    Cancel
+                  </button>
+                  <button type="submit" class="save-button">
+                    Save Changes
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
         <!-- Delete Confirmation Modal -->
         <div v-if="showDeleteModal" class="modal-overlay show">
           <div class="modal-content confirmation-modal">
@@ -533,6 +566,8 @@ const loading = ref(true);
 const error = ref(null);
 const isTeacher = ref(false);
 const studentSearch = ref('');
+const showEditGroupModal = ref(false);
+const editingGroup = ref(null);
 const showAddTeacherModal = ref(false);
 const showAddStudentModal = ref(false);
 const showCreateGroupModal = ref(false);
@@ -751,7 +786,21 @@ const addStudentToCourse = async (studentId) => {
 
 // Group actions
 const editGroup = (groupId) => {
-  console.log('Edit group:', groupId);
+  const group = course.value.groups.find(g => g.id === groupId);
+  editingGroup.value = { ...group };
+  showEditGroupModal.value = true;
+};
+
+const saveEditedGroup = async () => {
+  try {
+    await groupService.updateGroup(editingGroup.value.id, editingGroup.value);
+    showEditGroupModal.value = false;
+    editingGroup.value = null;
+    fetchCourseDetails();
+  } catch (error) {
+    console.error('Error updating group:', error);
+    error.value = 'Failed to update group. Please try again.';
+  }
 };
 
 const confirmDeleteGroup = (groupId) => {
