@@ -472,8 +472,14 @@ const addStudent = async (studentId) => {
   try {
     await groupService.addStudentToGroup(group.value.id, studentId);
     notificationStore.success('Student added to group successfully.');
-    // Refresh group data
-    fetchGroupDetails();
+    // Refresh both group data and available students list
+    await Promise.all([
+      fetchGroupDetails(),
+      fetchAvailableStudents()
+    ]);
+    // Reset search query and refilter students
+    studentSearchQuery.value = '';
+    filterStudents();
   } catch (err) {
     console.error('Error adding student:', err);
     notificationStore.error('Failed to add student. Please try again.');
@@ -496,8 +502,11 @@ const handleStudentRemoval = async () => {
     // Reset state
     showStudentDeleteModal.value = false;
     studentToDelete.value = null;
-    // Refresh group data
-    fetchGroupDetails();
+    // Refresh both group data and available students list
+    await Promise.all([
+      fetchGroupDetails(),
+      fetchAvailableStudents()
+    ]);
   } catch (err) {
     console.error('Error removing student:', err);
     notificationStore.error('Failed to remove student. Please try again.');
