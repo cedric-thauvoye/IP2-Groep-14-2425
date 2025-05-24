@@ -351,6 +351,35 @@
           </div>
         </div>
       </div>
+
+      <!-- Remove Student Confirmation Modal -->
+      <div v-if="showStudentDeleteModal" class="modal-overlay show">
+        <div class="modal-content confirmation-modal">
+          <div class="modal-header">
+            <h2>Confirm Student Removal</h2>
+            <button class="close-button" @click="showStudentDeleteModal = false">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="warning-icon">
+              <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <p class="confirmation-text">
+              Are you sure you want to remove {{ studentToDelete?.first_name }} {{ studentToDelete?.last_name }} from the group?
+            </p>
+            <p class="permanent-note">This action cannot be undone.</p>
+            <div class="action-buttons">
+              <button class="cancel-button" @click="showStudentDeleteModal = false">
+                Cancel
+              </button>
+              <button class="delete-button" @click="handleStudentRemoval">
+                Remove Student
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </PageLayout>
 </template>
@@ -360,9 +389,11 @@ import { ref, onMounted, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
 import { groupService, authService, assessmentService, userService } from '../services/api';
+import { useNotificationStore } from '../stores/notificationStore';
 
 const router = useRouter();
 const route = useRoute();
+const notificationStore = useNotificationStore();
 const group = ref({});
 const loading = ref(true);
 const error = ref(null);
@@ -376,22 +407,9 @@ const studentSearchQuery = ref('');
 const filteredStudents = ref([]);
 const showCreateAssessmentModal = ref(false);
 const submittingAssessment = ref(false);
-const newAssessment = ref({
-  title: '',
-  description: '',
-  dueDate: '',
-  groupId: '',
-  courseId: '',
-  criteria: [
-    {
-      name: 'Participation',
-      description: 'Level of participation in group activities',
-      minScore: 1,
-      maxScore: 10
-    }
-  ]
-});
 const showDeleteModal = ref(false);
+const showStudentDeleteModal = ref(false);
+const studentToDelete = ref(null);
 
 // Format date function
 const formatDate = (dateString) => {
@@ -453,25 +471,36 @@ const deleteGroup = async () => {
 const addStudent = async (studentId) => {
   try {
     await groupService.addStudentToGroup(group.value.id, studentId);
+    notificationStore.success('Student added to group successfully.');
     // Refresh group data
     fetchGroupDetails();
   } catch (err) {
     console.error('Error adding student:', err);
-    error.value = 'Failed to add student. Please try again.';
+    notificationStore.error('Failed to add student. Please try again.');
   }
 };
 
-// Remove student from group
-const removeStudent = async (studentId) => {
-  if (confirm('Are you sure you want to remove this student from the group?')) {
-    try {
-      await groupService.removeStudentFromGroup(group.value.id, studentId);
-      // Refresh group data
-      fetchGroupDetails();
-    } catch (err) {
-      console.error('Error removing student:', err);
-      error.value = 'Failed to remove student. Please try again.';
-    }
+// Initialize student removal
+const removeStudent = (studentId) => {
+  studentToDelete.value = group.value.students.find(student => student.id === studentId);
+  showStudentDeleteModal.value = true;
+};
+
+// Handle student removal after confirmation
+const handleStudentRemoval = async () => {
+  if (!studentToDelete.value) return;
+
+  try {
+    await groupService.removeStudentFromGroup(group.value.id, studentToDelete.value.id);
+    notificationStore.success(`${studentToDelete.value.first_name} ${studentToDelete.value.last_name} has been removed from the group.`);
+    // Reset state
+    showStudentDeleteModal.value = false;
+    studentToDelete.value = null;
+    // Refresh group data
+    fetchGroupDetails();
+  } catch (err) {
+    console.error('Error removing student:', err);
+    notificationStore.error('Failed to remove student. Please try again.');
   }
 };
 

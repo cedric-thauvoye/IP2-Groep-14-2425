@@ -557,6 +557,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
 import { courseService, authService, userService, groupService } from '../services/api';
+import { useNotificationStore } from '../stores/notificationStore';
 
 const router = useRouter();
 const route = useRoute();
@@ -762,25 +763,30 @@ const removeStudent = (studentId) => {
   showStudentDeleteModal.value = true;
 };
 
+const notificationStore = useNotificationStore();
+
 const handleStudentRemoval = async () => {
   try {
     await courseService.removeStudentFromCourse(course.value.id, studentToDelete.value);
+    notificationStore.success('Student has been removed from the course successfully.');
     showStudentDeleteModal.value = false;
     studentToDelete.value = null;
     fetchCourseDetails();
   } catch (err) {
     console.error('Error removing student:', err);
-    error.value = 'Failed to remove student. Please try again.';
+    notificationStore.error('Failed to remove student. Please try again.');
   }
 };
 
 const addStudentToCourse = async (studentId) => {
   try {
     await courseService.addStudentToCourse(course.value.id, studentId);
+    notificationStore.success('Student has been added to the course successfully.');
     showAddStudentModal.value = false;
     fetchCourseDetails();
   } catch (error) {
     console.error('Error adding student:', error);
+    notificationStore.error('Failed to add student to the course. Please try again.');
   }
 };
 
