@@ -55,8 +55,9 @@ module.exports = (pool) => {
         query = `
           SELECT a.id, a.title, a.description, a.due_date, c.name as courseName,
                  g.name as groupName,
-                 (SELECT COUNT(r.id) FROM responses r WHERE r.assessment_id = a.id) as responses_count,
-                 (SELECT COUNT(gs.id) FROM group_students gs WHERE gs.group_id = a.group_id) as students_count
+                 (SELECT COUNT(r.id) FROM responses r WHERE r.assessment_id = a.id AND r.submitted_at IS NOT NULL) as responses_count,
+                 (SELECT COUNT(gs.id) FROM group_students gs WHERE gs.group_id = a.group_id) as students_count,
+                 (SELECT COUNT(r.id) FROM responses r WHERE r.assessment_id = a.id AND r.submitted_at IS NOT NULL AND r.feedback IS NOT NULL AND r.feedback != '') as feedback_count
           FROM assessments a
           JOIN courses c ON a.course_id = c.id
           JOIN groups g ON a.group_id = g.id
@@ -96,6 +97,7 @@ module.exports = (pool) => {
             dueDate: row.due_date,
             responsesCount: row.responses_count,
             studentsCount: row.students_count,
+            feedbackCount: row.feedback_count || 0,
             progress: completionPercentage
           };
         }
@@ -137,14 +139,15 @@ module.exports = (pool) => {
         query = `
           SELECT a.id, a.title, a.description, c.name as courseName,
                  g.name as groupName, a.due_date,
-                 (SELECT COUNT(r.id) FROM responses r WHERE r.assessment_id = a.id) as responses_count,
-                 (SELECT COUNT(gs.id) FROM group_students gs WHERE gs.group_id = a.group_id) as students_count
+                 (SELECT COUNT(r.id) FROM responses r WHERE r.assessment_id = a.id AND r.submitted_at IS NOT NULL) as responses_count,
+                 (SELECT COUNT(gs.id) FROM group_students gs WHERE gs.group_id = a.group_id) as students_count,
+                 (SELECT COUNT(r.id) FROM responses r WHERE r.assessment_id = a.id AND r.submitted_at IS NOT NULL AND r.feedback IS NOT NULL AND r.feedback != '') as feedback_count
           FROM assessments a
           JOIN courses c ON a.course_id = c.id
           JOIN groups g ON a.group_id = g.id
           WHERE a.teacher_id = ?
           AND (a.due_date < NOW() OR
-               (SELECT COUNT(r.id) FROM responses r WHERE r.assessment_id = a.id) =
+               (SELECT COUNT(r.id) FROM responses r WHERE r.assessment_id = a.id AND r.submitted_at IS NOT NULL) =
                (SELECT COUNT(gs.id) FROM group_students gs WHERE gs.group_id = a.group_id))
           ORDER BY a.due_date DESC`;
         params = [req.user.id];
@@ -181,6 +184,7 @@ module.exports = (pool) => {
             dueDate: row.due_date,
             responsesCount: row.responses_count,
             studentsCount: row.students_count,
+            feedbackCount: row.feedback_count || 0,
             completionRate: `${completionPercentage}%`
           };
         }
@@ -229,11 +233,21 @@ module.exports = (pool) => {
           conn.release();
           return res.status(403).json({ message: 'Not authorized to view this assessment' });
         }
-      } else if (req.user.role === 'teacher' && assessment.teacher_id !== req.user.id) {
-        // Check if teacher created this assessment
-        conn.release();
-        return res.status(403).json({ message: 'Not authorized to view this assessment' });
+      } else if (req.user.role === 'teacher') {
+        // Check if teacher teaches the course of this assessment
+        const [teacherCheck] = await conn.execute(
+          `SELECT 1 FROM course_teachers ct
+           JOIN assessments a ON ct.course_id = a.course_id
+           WHERE a.id = ? AND ct.teacher_id = ?`,
+          [id, req.user.id]
+        );
+
+        if (teacherCheck.length === 0) {
+          conn.release();
+          return res.status(403).json({ message: 'Not authorized to view this assessment' });
+        }
       }
+      // Admins have access to all assessments
 
       // Get assessment criteria
       const [criteria] = await conn.execute(
@@ -586,8 +600,16 @@ module.exports = (pool) => {
           [assessment.group_id, req.user.id]
         );
       } else if (req.user.role === 'teacher') {
-        // Teachers must have created the assessment
-        permissionCheck = assessment.teacher_id === req.user.id ? [1] : [];
+        // Teachers must teach the course of this assessment
+        [permissionCheck] = await conn.execute(
+          `SELECT 1 FROM course_teachers ct
+           JOIN assessments a ON ct.course_id = a.course_id
+           WHERE a.id = ? AND ct.teacher_id = ?`,
+          [id, req.user.id]
+        );
+      } else if (req.user.role === 'admin') {
+        // Admins can view any results
+        permissionCheck = [1];
       }
 
       if (!permissionCheck || permissionCheck.length === 0) {
@@ -610,30 +632,69 @@ module.exports = (pool) => {
         // Students see their own results
         const [studentResults] = await conn.execute(
           `SELECT
-             ar.criteria_id,
+             ac.id as criteria_id,
              ac.name as criteria_name,
-             AVG(ar.given_score) as average_score,
-             COUNT(ar.id) as number_of_ratings
-           FROM average_results ar
-           JOIN assessment_criteria ac ON ar.criteria_id = ac.id
-           WHERE ar.assessment_id = ? AND ar.student_id = ?
-           GROUP BY ar.criteria_id`,
+             ac.max_score,
+             AVG(r.given_score) as average_score,
+             COUNT(r.id) as number_of_ratings
+           FROM assessment_criteria ac
+           LEFT JOIN results r ON ac.id = r.criteria_id AND r.student_id = ?
+           LEFT JOIN responses resp ON r.response_id = resp.id AND resp.assessment_id = ?
+           WHERE ac.assessment_id = ?
+           GROUP BY ac.id, ac.name, ac.max_score`,
+          [req.user.id, id, id]
+        );
+
+        // Get overall average and total max score
+        const [overallAvg] = await conn.execute(
+          `SELECT
+             AVG(r.given_score) as overall_average,
+             AVG(ac.max_score) as max_average
+           FROM results r
+           JOIN responses resp ON r.response_id = resp.id
+           JOIN assessment_criteria ac ON r.criteria_id = ac.id
+           WHERE resp.assessment_id = ? AND r.student_id = ?`,
           [id, req.user.id]
         );
 
-        // Get overall average
-        const [overallAvg] = await conn.execute(
-          `SELECT AVG(average_score) as overall_average
-           FROM average_results
-           WHERE assessment_id = ? AND student_id = ?`,
-          [id, req.user.id]
-        );
+        // Helper function to get color based on score percentage
+        const getScoreColor = (score, maxScore) => {
+          if (!score || !maxScore) return 'neutral';
+          const percentage = (score / maxScore) * 100;
+          if (percentage >= 80) return 'excellent';
+          if (percentage >= 70) return 'good';
+          if (percentage >= 60) return 'average';
+          if (percentage >= 50) return 'below-average';
+          return 'poor';
+        };
 
         results = {
-          criteria: studentResults,
-          overallAverage: overallAvg[0].overall_average ? parseFloat(overallAvg[0].overall_average).toFixed(1) : 'N/A'
+          criteria: studentResults.map(criteria => ({
+            ...criteria,
+            average_score: criteria.average_score ? parseFloat(criteria.average_score).toFixed(1) : 'N/A',
+            score_display: criteria.average_score ?
+              `${parseFloat(criteria.average_score).toFixed(1)}/${criteria.max_score}` :
+              `N/A/${criteria.max_score}`,
+            score_color: getScoreColor(criteria.average_score, criteria.max_score)
+          })),
+          overallAverage: overallAvg[0].overall_average ? parseFloat(overallAvg[0].overall_average).toFixed(1) : 'N/A',
+          overallAverageDisplay: overallAvg[0].overall_average && overallAvg[0].max_average ?
+            `${parseFloat(overallAvg[0].overall_average).toFixed(1)}/${parseFloat(overallAvg[0].max_average).toFixed(1)}` :
+            'N/A',
+          overallScoreColor: getScoreColor(overallAvg[0].overall_average, overallAvg[0].max_average)
         };
       } else {
+        // Helper function to get color based on score percentage
+        const getScoreColor = (score, maxScore) => {
+          if (!score || !maxScore) return 'neutral';
+          const percentage = (score / maxScore) * 100;
+          if (percentage >= 80) return 'excellent';
+          if (percentage >= 70) return 'good';
+          if (percentage >= 60) return 'average';
+          if (percentage >= 50) return 'below-average';
+          return 'poor';
+        };
+
         // Teachers see results for all students in the group
         const [studentList] = await conn.execute(
           `SELECT u.id, u.first_name, u.last_name, u.q_number
@@ -645,27 +706,67 @@ module.exports = (pool) => {
 
         const studentResults = [];
 
-        // For each student, get their average scores by criteria
+        // For each student, get their average scores by criteria and feedback
         for (const student of studentList) {
           const [criteriaScores] = await conn.execute(
             `SELECT
-               ar.criteria_id,
+               ac.id as criteria_id,
                ac.name as criteria_name,
-               ar.average_score,
-               (SELECT COUNT(r.id) FROM results r
-                JOIN responses resp ON r.response_id = resp.id
-                WHERE r.criteria_id = ar.criteria_id AND r.student_id = ar.student_id) as number_of_ratings
-             FROM average_results ar
-             JOIN assessment_criteria ac ON ar.criteria_id = ac.id
-             WHERE ar.assessment_id = ? AND ar.student_id = ?`,
-            [id, student.id]
+               ac.max_score,
+               AVG(r.given_score) as average_score,
+               COUNT(r.id) as number_of_ratings
+             FROM assessment_criteria ac
+             LEFT JOIN results r ON ac.id = r.criteria_id AND r.student_id = ?
+             LEFT JOIN responses resp ON r.response_id = resp.id AND resp.assessment_id = ?
+             WHERE ac.assessment_id = ?
+             GROUP BY ac.id, ac.name, ac.max_score`,
+            [student.id, id, id]
           );
 
           // Get overall average for this student
           const [overallAvg] = await conn.execute(
-            `SELECT AVG(average_score) as overall_average
-             FROM average_results
-             WHERE assessment_id = ? AND student_id = ?`,
+            `SELECT
+               AVG(r.given_score) as overall_average,
+               AVG(ac.max_score) as max_average
+             FROM results r
+             JOIN responses resp ON r.response_id = resp.id
+             JOIN assessment_criteria ac ON r.criteria_id = ac.id
+             WHERE resp.assessment_id = ? AND r.student_id = ?`,
+            [id, student.id]
+          );
+
+          // Get feedback from other students about this student
+          const [feedbackFromOthers] = await conn.execute(
+            `SELECT
+               resp.feedback,
+               u.first_name,
+               u.last_name,
+               resp.submitted_at
+             FROM responses resp
+             JOIN users u ON resp.student_id = u.id
+             JOIN results r ON r.response_id = resp.id
+             WHERE resp.assessment_id = ?
+             AND r.student_id = ?
+             AND resp.feedback IS NOT NULL
+             AND resp.feedback != ''
+             AND resp.submitted_at IS NOT NULL
+             GROUP BY resp.id`,
+            [id, student.id]
+          );
+
+          // Get feedback given by this student about others
+          const [feedbackGivenByStudent] = await conn.execute(
+            `SELECT
+               resp.feedback,
+               GROUP_CONCAT(DISTINCT CONCAT(u2.first_name, ' ', u2.last_name) SEPARATOR ', ') as evaluated_students,
+               resp.submitted_at
+             FROM responses resp
+             LEFT JOIN results r ON r.response_id = resp.id
+             LEFT JOIN users u2 ON r.student_id = u2.id
+             WHERE resp.assessment_id = ?
+             AND resp.student_id = ?
+             AND resp.submitted_at IS NOT NULL
+             GROUP BY resp.id`,
             [id, student.id]
           );
 
@@ -676,8 +777,21 @@ module.exports = (pool) => {
               lastName: student.last_name,
               qNumber: student.q_number
             },
-            criteriaScores: criteriaScores,
-            overallAverage: overallAvg[0].overall_average ? parseFloat(overallAvg[0].overall_average).toFixed(1) : 'N/A'
+            criteriaScores: criteriaScores.map(criteria => ({
+              ...criteria,
+              average_score: criteria.average_score ? parseFloat(criteria.average_score).toFixed(1) : 'N/A',
+              score_display: criteria.average_score ?
+                `${parseFloat(criteria.average_score).toFixed(1)}/${criteria.max_score}` :
+                `N/A/${criteria.max_score}`,
+              score_color: getScoreColor(criteria.average_score, criteria.max_score)
+            })),
+            overallAverage: overallAvg[0].overall_average ? parseFloat(overallAvg[0].overall_average).toFixed(1) : 'N/A',
+            overallAverageDisplay: overallAvg[0].overall_average && overallAvg[0].max_average ?
+              `${parseFloat(overallAvg[0].overall_average).toFixed(1)}/${parseFloat(overallAvg[0].max_average).toFixed(1)}` :
+              'N/A',
+            overallScoreColor: getScoreColor(overallAvg[0].overall_average, overallAvg[0].max_average),
+            feedbackReceived: feedbackFromOthers,
+            feedbackGiven: feedbackGivenByStudent[0] || null
           });
         }
 
@@ -698,6 +812,82 @@ module.exports = (pool) => {
       });
     } catch (error) {
       console.error('Error fetching assessment results:', error);
+      res.status(500).json({ message: 'Server error' });
+    }
+  });
+
+  // Get feedback for assessment (teachers only)
+  router.get('/:id/feedback', authenticateToken, async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      // Only teachers can access feedback
+      if (req.user.role !== 'teacher' && req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Only teachers can view feedback' });
+      }
+
+      const conn = await pool.getConnection();
+
+      // Check if teacher can access this assessment (teacher of the course)
+      const [assessmentCheck] = await conn.execute(
+        `SELECT a.id, a.title, a.group_id
+         FROM assessments a
+         JOIN course_teachers ct ON a.course_id = ct.course_id
+         WHERE a.id = ? AND (ct.teacher_id = ? OR ? = 'admin')`,
+        [id, req.user.id, req.user.role]
+      );
+
+      if (assessmentCheck.length === 0) {
+        conn.release();
+        return res.status(403).json({ message: 'Not authorized to view this assessment feedback' });
+      }
+
+      const assessment = assessmentCheck[0];
+
+      // Get all feedback for this assessment
+      const [feedbackData] = await conn.execute(
+        `SELECT
+           r.id as response_id,
+           r.feedback,
+           r.submitted_at,
+           u.first_name as student_first_name,
+           u.last_name as student_last_name,
+           u.q_number as student_q_number,
+           GROUP_CONCAT(DISTINCT CONCAT(u2.first_name, ' ', u2.last_name) SEPARATOR ', ') as evaluated_students
+         FROM responses r
+         JOIN users u ON r.student_id = u.id
+         LEFT JOIN results res ON res.response_id = r.id
+         LEFT JOIN users u2 ON res.student_id = u2.id
+         WHERE r.assessment_id = ?
+         AND r.submitted_at IS NOT NULL
+         AND r.feedback IS NOT NULL
+         AND r.feedback != ''
+         GROUP BY r.id
+         ORDER BY r.submitted_at DESC`,
+        [id]
+      );
+
+      conn.release();
+
+      res.json({
+        assessment: {
+          id: assessment.id,
+          title: assessment.title
+        },
+        feedback: feedbackData.map(row => ({
+          responseId: row.response_id,
+          feedback: row.feedback,
+          submittedAt: row.submitted_at,
+          student: {
+            firstName: row.student_first_name,
+            lastName: row.student_last_name,
+            qNumber: row.student_q_number
+          },
+          evaluatedStudents: row.evaluated_students
+        }))
+      });
+    } catch (error) {
+      console.error('Error fetching assessment feedback:', error);
       res.status(500).json({ message: 'Server error' });
     }
   });

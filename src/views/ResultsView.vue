@@ -85,8 +85,8 @@
                                     <td>{{ result.courseName }}</td>
                                     <td>{{ result.groupName }}</td>
                                     <td>
-                                        <span class="score" :class="getScoreClass(result.score)">
-                                            {{ result.score === 'N/A' || result.score === 'Pending' ? result.score : result.score.toFixed(1) }}
+                                        <span class="score">
+                                            {{ formatScoreOnly(result.score) }}
                                         </span>
                                     </td>
                                     <td>{{ formatDate(result.date) }}</td>
@@ -184,13 +184,11 @@ const formatDate = (date) => {
     }
 };
 
-const getScoreClass = (score) => {
-    if (score === 'N/A' || score === 'Pending') return 'pending';
-
-    if (typeof score !== 'number') return 'pending';
-    if (score >= 8) return 'excellent';
-    if (score >= 6) return 'good';
-    return 'needs-improvement';
+const formatScoreOnly = (score) => {
+    if (score === 'N/A' || score === 'Pending' || typeof score !== 'number') {
+        return score;
+    }
+    return score.toFixed(1);
 };
 
 const loadGroups = async () => {
@@ -316,6 +314,7 @@ onMounted(async () => {
                             groupId: groupId,
                             // Format the score correctly - it comes as a string like "8.5"
                             score: studentResult.overallAverage !== 'N/A' ? parseFloat(studentResult.overallAverage) : 'N/A',
+                            maxScore: detailData.maxScore || 20, // Get maxScore from assessment details
                             date: assessment.dueDate
                         });
                     });
@@ -330,6 +329,7 @@ onMounted(async () => {
                         groupName: assessment.groupName,
                         groupId: groupId,
                         score: 'N/A',
+                        maxScore: detailData.maxScore || 20, // Get maxScore from assessment details
                         date: assessment.dueDate
                     });
                 }
@@ -346,6 +346,7 @@ onMounted(async () => {
                     groupName: assessment.groupName,
                     groupId: null,
                     score: 'N/A',
+                    maxScore: 20, // Default maxScore when details can't be fetched
                     date: assessment.dueDate
                 });
             }
@@ -466,26 +467,8 @@ td {
     font-weight: 600;
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
-}
-
-.score.excellent {
-    background-color: #d4edda;
-    color: #155724;
-}
-
-.score.good {
-    background-color: #fff3cd;
-    color: #856404;
-}
-
-.score.needs-improvement {
-    background-color: #f8d7da;
-    color: #721c24;
-}
-
-.score.pending {
-    background-color: #e2e3e5;
-    color: #383d41;
+    background-color: #f8f9fa;
+    color: #2c3e50;
 }
 
 .icon-button {

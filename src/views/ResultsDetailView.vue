@@ -30,6 +30,9 @@
                         </div>
                     </div>
                     <div class="header-actions">
+                        <button v-if="!isStudent" class="feedback-overview-button" @click="showAllFeedback">
+                            <i class="fas fa-comments"></i> View All Feedback
+                        </button>
                         <button class="back-button" @click="goBack">
                             <i class="fas fa-arrow-left"></i> Back
                         </button>
@@ -42,8 +45,8 @@
 
                     <!-- For students: show their own results -->
                     <div v-if="isStudent" class="student-result">
-                        <div class="score-card">
-                            <div class="score-value">{{ assessment.results.overallAverage }}</div>
+                        <div class="score-card" :class="assessment.results.overallScoreColor ? `score-${assessment.results.overallScoreColor}` : ''">
+                            <div class="score-value">{{ assessment.results.overallAverageDisplay || assessment.results.overallAverage }}</div>
                             <div class="score-label">Overall Score</div>
                         </div>
 
@@ -62,7 +65,7 @@
                                     class="criteria-row"
                                 >
                                     <span class="criteria-name">{{ criterion.criteria_name }}</span>
-                                    <span class="criteria-score">{{ criterion.average_score }}</span>
+                                    <span class="criteria-score" :class="criterion.score_color ? `score-${criterion.score_color}` : ''">{{ criterion.score_display || criterion.average_score }}</span>
                                     <span class="criteria-count">{{ criterion.number_of_ratings }}</span>
                                 </div>
                             </div>
@@ -104,7 +107,7 @@
                                     <tr v-for="student in assessment.results" :key="student.student.id">
                                         <td>{{ student.student.firstName }} {{ student.student.lastName }}</td>
                                         <td>{{ student.student.qNumber }}</td>
-                                        <td class="score-cell">{{ student.overallAverage }}</td>
+                                        <td class="score-cell" :class="student.overallScoreColor ? `score-${student.overallScoreColor}` : ''">{{ student.overallAverageDisplay || student.overallAverage }}</td>
                                         <td>
                                             <button
                                                 class="view-details-button"
@@ -126,8 +129,8 @@
                             </div>
 
                             <div class="score-summary">
-                                <div class="score-card large">
-                                    <div class="score-value">{{ selectedStudent.overallAverage }}</div>
+                                <div class="score-card large" :class="selectedStudent.overallScoreColor ? `score-${selectedStudent.overallScoreColor}` : ''">
+                                    <div class="score-value">{{ selectedStudent.overallAverageDisplay || selectedStudent.overallAverage }}</div>
                                     <div class="score-label">Overall Score</div>
                                 </div>
                             </div>
@@ -147,15 +150,104 @@
                                         class="criteria-row"
                                     >
                                         <span class="criteria-name">{{ criterion.criteria_name }}</span>
-                                        <span class="criteria-score">{{ criterion.average_score }}</span>
+                                        <span class="criteria-score" :class="criterion.score_color ? `score-${criterion.score_color}` : ''">{{ criterion.score_display || criterion.average_score }}</span>
                                         <span class="criteria-count">{{ criterion.number_of_ratings }}</span>
                                     </div>
+                                </div>
+                            </div>
+
+                            <!-- Feedback Sections -->
+                            <div class="feedback-sections">
+                                <!-- Feedback Received by this student -->
+                                <div v-if="selectedStudent.feedbackReceived && selectedStudent.feedbackReceived.length > 0" class="feedback-section">
+                                    <h3>Feedback Received</h3>
+                                    <div class="feedback-list">
+                                        <div
+                                            v-for="(feedback, index) in selectedStudent.feedbackReceived"
+                                            :key="index"
+                                            class="feedback-item"
+                                        >
+                                            <div class="feedback-header">
+                                                <span class="feedback-author">From: {{ feedback.first_name }} {{ feedback.last_name }}</span>
+                                                <span class="feedback-date">{{ formatDate(feedback.submitted_at) }}</span>
+                                            </div>
+                                            <div class="feedback-content">{{ feedback.feedback }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Feedback Given by this student -->
+                                <div v-if="selectedStudent.feedbackGiven && selectedStudent.feedbackGiven.feedback" class="feedback-section">
+                                    <h3>Feedback Given</h3>
+                                    <div class="feedback-item">
+                                        <div class="feedback-header">
+                                            <span class="feedback-author">
+                                                About: {{ selectedStudent.feedbackGiven.evaluated_students || 'Team members' }}
+                                            </span>
+                                            <span class="feedback-date">{{ formatDate(selectedStudent.feedbackGiven.submitted_at) }}</span>
+                                        </div>
+                                        <div class="feedback-content">{{ selectedStudent.feedbackGiven.feedback }}</div>
+                                    </div>
+                                </div>
+
+                                <!-- No feedback message -->
+                                <div v-if="(!selectedStudent.feedbackReceived || selectedStudent.feedbackReceived.length === 0) &&
+                                         (!selectedStudent.feedbackGiven || !selectedStudent.feedbackGiven.feedback)"
+                                     class="no-feedback">
+                                    <i class="fas fa-comment-slash"></i>
+                                    <p>No feedback available for this student yet.</p>
                                 </div>
                             </div>
 
                             <button class="back-to-all-button" @click="selectedStudentId = ''">
                                 Back to All Students
                             </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feedback Overview Modal -->
+        <div v-if="showFeedbackModal" class="modal-overlay" @click="closeFeedbackModal">
+            <div class="modal-content" @click.stop>
+                <div class="modal-header">
+                    <h2>All Feedback - {{ assessment.title }}</h2>
+                    <button class="close-button" @click="closeFeedbackModal">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <div class="modal-body">
+                    <div v-if="loadingFeedback" class="loading-state">
+                        <i class="fas fa-spinner fa-spin"></i>
+                        <p>Loading feedback...</p>
+                    </div>
+
+                    <div v-else-if="allFeedback.length === 0" class="no-feedback">
+                        <i class="fas fa-comment-slash"></i>
+                        <p>No feedback has been submitted yet.</p>
+                    </div>
+
+                    <div v-else class="feedback-overview">
+                        <div
+                            v-for="(feedbackItem, index) in allFeedback"
+                            :key="index"
+                            class="feedback-item-overview"
+                        >
+                            <div class="feedback-header">
+                                <div class="student-info">
+                                    <strong>{{ feedbackItem.student.firstName }} {{ feedbackItem.student.lastName }}</strong>
+                                    <span class="student-id">({{ feedbackItem.student.qNumber }})</span>
+                                </div>
+                                <div class="feedback-meta">
+                                    <span class="feedback-date">{{ formatDate(feedbackItem.submittedAt) }}</span>
+                                    <span v-if="feedbackItem.evaluatedStudents" class="evaluated-students">
+                                        About: {{ feedbackItem.evaluatedStudents }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="feedback-content">{{ feedbackItem.feedback }}</div>
                         </div>
                     </div>
                 </div>
@@ -185,10 +277,24 @@ const error = ref(null);
 const isStudent = ref(false);
 const selectedStudentId = ref('');
 const selectedStudent = ref(null);
+const showFeedbackModal = ref(false);
+const loadingFeedback = ref(false);
+const allFeedback = ref([]);
 
 // Navigate back to the assessments list
 const goBack = () => {
     router.push('/assessments');
+};
+
+// Format date for display
+const formatDate = (date) => {
+    return new Date(date).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
 };
 
 // Fetch assessment results
@@ -242,6 +348,28 @@ const updateSelectedStudent = () => {
     selectedStudent.value = assessment.value.results.find(
         result => result.student.id === selectedStudentId.value
     );
+};
+
+// Show all feedback modal
+const showAllFeedback = async () => {
+    showFeedbackModal.value = true;
+    loadingFeedback.value = true;
+
+    try {
+        const { data } = await assessmentService.getAssessmentFeedback(assessmentId);
+        allFeedback.value = data.feedback;
+    } catch (err) {
+        console.error('Error fetching feedback:', err);
+        allFeedback.value = [];
+    } finally {
+        loadingFeedback.value = false;
+    }
+};
+
+// Close feedback modal
+const closeFeedbackModal = () => {
+    showFeedbackModal.value = false;
+    allFeedback.value = [];
 };
 
 // Load results when component mounts
@@ -301,6 +429,30 @@ onMounted(() => {
 
 .meta-item i {
     color: #3498db;
+}
+
+.header-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+.feedback-overview-button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 0.6rem 1.2rem;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.feedback-overview-button:hover {
+    background-color: #2980b9;
+    transform: translateY(-1px);
 }
 
 .back-button {
@@ -466,6 +618,205 @@ tbody td {
     color: #7f8c8d;
 }
 
+/* Feedback Sections Styling */
+.feedback-sections {
+    margin-top: 2rem;
+}
+
+.feedback-section {
+    margin-bottom: 2rem;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 1.5rem;
+    border-left: 4px solid #3498db;
+}
+
+.feedback-section h3 {
+    margin: 0 0 1rem 0;
+    color: #2c3e50;
+    font-size: 1.1rem;
+}
+
+.feedback-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.feedback-item {
+    background-color: white;
+    border-radius: 6px;
+    padding: 1rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.feedback-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.feedback-author {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 0.9rem;
+}
+
+.feedback-date {
+    color: #7f8c8d;
+    font-size: 0.85rem;
+}
+
+.feedback-content {
+    color: #2c3e50;
+    line-height: 1.5;
+    font-size: 0.95rem;
+}
+
+.no-feedback {
+    text-align: center;
+    padding: 2rem;
+    color: #7f8c8d;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 2px dashed #ddd;
+}
+
+.no-feedback i {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    display: block;
+}
+
+.no-feedback p {
+    margin: 0;
+    font-style: italic;
+}
+
+/* Modal Styling */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background-color: white;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 800px;
+    max-height: 80vh;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid #e1e1e1;
+    background-color: #f8f9fa;
+}
+
+.modal-header h2 {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 1.3rem;
+}
+
+.close-button {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #7f8c8d;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.close-button:hover {
+    color: #e74c3c;
+    background-color: rgba(231, 76, 60, 0.1);
+}
+
+.modal-body {
+    padding: 1.5rem;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.feedback-overview {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.feedback-item-overview {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 1.5rem;
+    border-left: 4px solid #3498db;
+}
+
+.feedback-item-overview .feedback-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.student-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.student-info .student-id {
+    color: #7f8c8d;
+    font-size: 0.9rem;
+}
+
+.feedback-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.25rem;
+}
+
+.feedback-meta .feedback-date {
+    color: #7f8c8d;
+    font-size: 0.85rem;
+}
+
+.feedback-meta .evaluated-students {
+    color: #3498db;
+    font-size: 0.85rem;
+    font-style: italic;
+}
+
+.feedback-item-overview .feedback-content {
+    background-color: white;
+    padding: 1rem;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+    line-height: 1.5;
+    color: #2c3e50;
+}
+
 .score-summary {
     display: flex;
     justify-content: center;
@@ -515,5 +866,60 @@ tbody td {
     .results-filter select {
         width: 100%;
     }
+}
+
+/* Score color classes */
+.score-excellent {
+    color: #27ae60 !important;
+    font-weight: bold;
+}
+
+.score-good {
+    color: #2ecc71 !important;
+    font-weight: bold;
+}
+
+.score-average {
+    color: #f39c12 !important;
+    font-weight: bold;
+}
+
+.score-below-average {
+    color: #e67e22 !important;
+    font-weight: bold;
+}
+
+.score-poor {
+    color: #e74c3c !important;
+    font-weight: bold;
+}
+
+.score-neutral {
+    color: #7f8c8d !important;
+}
+
+/* Apply colors to score cards as well */
+.score-card.score-excellent .score-value {
+    color: #27ae60;
+}
+
+.score-card.score-good .score-value {
+    color: #2ecc71;
+}
+
+.score-card.score-average .score-value {
+    color: #f39c12;
+}
+
+.score-card.score-below-average .score-value {
+    color: #e67e22;
+}
+
+.score-card.score-poor .score-value {
+    color: #e74c3c;
+}
+
+.score-card.score-neutral .score-value {
+    color: #7f8c8d;
 }
 </style>

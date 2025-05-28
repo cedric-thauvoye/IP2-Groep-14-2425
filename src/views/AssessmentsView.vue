@@ -73,19 +73,31 @@
 
                                     <div class="assessment-content">
                                         <p>{{ assessment.description }}</p>
-                                        <div class="completion-stats">
+                                        <div class="completion-stats" v-if="!isStudent">
                                             <div class="stats-row">
                                                 <span>Responses:</span>
                                                 <span class="stat-value">
-                                                    {{ assessment.completedCount }}/{{ assessment.totalStudents }}
+                                                    {{ assessment.responsesCount }}/{{ assessment.studentsCount }}
+                                                </span>
+                                            </div>
+                                            <div class="stats-row">
+                                                <span>With Feedback:</span>
+                                                <span class="stat-value">
+                                                    {{ assessment.feedbackCount }}/{{ assessment.studentsCount }}
                                                 </span>
                                             </div>
                                             <div class="progress-bar">
                                                 <div
                                                     class="progress"
-                                                    :style="{ width: (assessment.completedCount / assessment.totalStudents * 100) + '%' }"
+                                                    :style="{ width: assessment.progress + '%' }"
                                                 ></div>
                                             </div>
+                                        </div>
+                                        <div class="completion-stats" v-else>
+                                            <div class="progress-bar">
+                                                <div class="progress" :style="{ width: assessment.progress + '%' }"></div>
+                                            </div>
+                                            <p class="progress-text">{{ assessment.progress }}% Complete</p>
                                         </div>
                                     </div>
 

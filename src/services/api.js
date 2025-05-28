@@ -59,6 +59,7 @@ export const assessmentService = {
   deleteAssessment: (id) => apiClient.delete(`/assessments/${id}`),
   submitAssessment: (id, data) => apiClient.post(`/assessments/${id}/submit`, data),
   getAssessmentResults: (id) => apiClient.get(`/assessments/${id}/results`),
+  getAssessmentFeedback: (id) => apiClient.get(`/assessments/${id}/feedback`),
 };
 
 // Course services
