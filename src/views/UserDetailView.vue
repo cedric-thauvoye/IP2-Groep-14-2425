@@ -268,10 +268,8 @@
             </form>
           </div>
         </div>
-      </div>
-
-      <!-- Delete User Confirmation Modal -->
-      <div v-if="showDeleteModal" class="modal-overlay">
+      </div>      <!-- Delete User Confirmation Modal -->
+      <div v-if="showDeleteModal" class="modal-overlay show">
         <div class="modal-content confirmation-modal">
           <div class="modal-header">
             <h2>Confirm Deletion</h2>
@@ -287,7 +285,6 @@
               Are you sure you want to delete the user "{{ user.first_name }} {{ user.last_name }}"?
             </p>
             <p class="permanent-note">This action cannot be undone.</p>
-
             <div class="security-verification">
               <label for="delete-admin-password">Admin Password:</label>
               <input
@@ -295,6 +292,7 @@
                 id="delete-admin-password"
                 v-model="deletePassword"
                 placeholder="Enter your password to confirm"
+                required
               >
             </div>
           </div>
@@ -420,7 +418,7 @@ const resetPassword = async () => {
     // First verify admin password
     const verification = await authService.verifyPassword(passwordForm.value.adminPassword);
     if (!verification.data.valid) {
-      alert('Incorrect password. Password reset cancelled.');
+      notificationStore.error('Incorrect password. Password reset cancelled.');
       return;
     }
 
@@ -428,7 +426,7 @@ const resetPassword = async () => {
       password: passwordForm.value.password
     });
 
-    alert('Password has been reset successfully.');
+    notificationStore.success('Password has been reset successfully.');
     showResetPasswordModal.value = false;
     passwordForm.value = {
       password: '',
@@ -453,12 +451,12 @@ const deleteUser = async () => {
     // Verify admin password first
     const verification = await authService.verifyPassword(deletePassword.value);
     if (!verification.data.valid) {
-      alert('Incorrect password. Delete operation cancelled.');
+      notificationStore.error('Incorrect password. Delete operation cancelled.');
       return;
     }
 
     await userService.deleteUser(user.value.id);
-    alert('User has been deleted successfully.');
+    notificationStore.success('User has been deleted successfully.');
     router.push('/admin');
   } catch (err) {
     console.error('Error deleting user:', err);
@@ -843,106 +841,130 @@ onMounted(async () => {
   border: none;
   font-size: 1.2rem;
   cursor: pointer;
+  color: #7f8c8d;
+  transition: color 0.2s;
 }
 
-.modal-body {
-  padding: 1.5rem;
-}
-
-.form-group {
-  margin-bottom: 1rem;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 500;
-}
-
-.form-group input, .form-group select {
-  width: 100%;
-  padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  box-sizing: border-box; /* Add this to include padding in width calculation */
-  max-width: 100%; /* Ensure inputs don't exceed their container */
-}
-
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 1rem;
-  margin-top: 1.5rem;
-}
-
-.cancel-button {
-  background: #f8f9fa;
-  border: 1px solid #ddd;
-  padding: 0.75rem 1.5rem;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.submit-button {
-  background: #3498db;
-  color: white;
-  border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.error-message {
+.close-button:hover {
   color: #e74c3c;
-  font-size: 0.9rem;
-  margin-top: 0.5rem;
 }
 
-.security-verification {
-  background: #f8f9fa;
-  padding: 1rem;
-  border-radius: 8px;
-  margin-top: 1rem;
-}
-
-/* Confirmation modal */
+/* Confirmation modal styles */
 .confirmation-modal {
+  max-width: 450px;
+}
+
+.confirmation-modal .modal-header {
+  background: #f8f9fa;
+}
+
+.confirmation-modal .modal-body {
+  padding: 2rem;
   text-align: center;
 }
 
 .warning-icon {
   color: #e74c3c;
-  font-size: 2.5rem;
-  margin-bottom: 1rem;
+  font-size: 3rem;
+  margin-bottom: 1.5rem;
 }
 
 .confirmation-text {
   font-size: 1.1rem;
+  color: #2c3e50;
   margin-bottom: 0.5rem;
 }
 
 .permanent-note {
-  color: #e74c3c;
-  font-weight: 600;
-  margin-bottom: 1.5rem;
+  color: #7f8c8d;
+  font-size: 0.9rem;
+  margin-bottom: 2rem;
+}
+
+.security-verification {
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 8px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+}
+
+.security-verification label {
+  display: block;
+  margin-bottom: 0.75rem;
+  color: #2c3e50;
+  font-weight: 500;
+}
+
+.security-verification input {
+  width: calc(100% - 1.5rem);
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  margin: 0 auto;
+}
+
+.security-verification input:focus {
+  border-color: #3498db;
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.1);
+  outline: none;
 }
 
 .modal-footer {
   padding: 1rem 1.5rem;
-  display: flex;
-  justify-content: center;
-  gap: 1rem;
+  background: #f8f9fa;
   border-top: 1px solid #eee;
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
 }
 
-.confirm-button {
+.modal-footer .cancel-button {
+  background: white;
+  border: 1px solid #ddd;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  color: #2c3e50;
+  transition: all 0.2s ease;
+}
+
+.modal-footer .cancel-button:hover {
+  background: #f8f9fa;
+  border-color: #c8c9ca;
+}
+
+.modal-footer .confirm-button {
   background: #e74c3c;
   color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
 }
 
-.confirm-button:disabled {
-  opacity: 0.5;
+.modal-footer .confirm-button:hover:not(:disabled) {
+  background: #c0392b;
+}
+
+.modal-footer .confirm-button:disabled {
+  opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* Add smooth transition for modal */
+.modal-overlay {
+  transition: all 0.2s ease;
+  opacity: 1;
+}
+
+.modal-content {
+  transition: all 0.2s ease;
+  transform: translateY(0);
 }
 
 @media (max-width: 768px) {

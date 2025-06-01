@@ -2,9 +2,9 @@
     <PageLayout>
         <div class="assessments-container">
             <div class="header">
-                <h1>Assessments</h1>
-                <div class="actions" v-if="isTeacher">
-                    <button class="action-button" @click="showCreateModal = true">
+                <h1>{{ isTeacher ? 'Assessments' : 'My Assessments' }}</h1>
+                <div class="actions" v-if="isTeacher || isAdmin">
+                    <button class="action-button" @click="openCreateModal">
                         <i class="fas fa-plus"></i> Create Assessment
                     </button>
                 </div>
@@ -32,6 +32,95 @@
                 <p>Loading assessments...</p>
             </div>
 
+            <!-- Teacher View -->
+            <div v-else-if="isTeacher" class="teacher-assessments">
+                <div v-for="(courseData, courseName) in organizedAssessments"
+                     :key="courseName"
+                     class="course-section"
+                >
+                    <div class="course-header">
+                        <h2>{{ courseName }}</h2>
+                        <div class="course-stats">
+                            <span class="group-count">
+                                {{ Object.keys(courseData.groups).length }} Groups
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="groups-container">
+                        <div v-for="(assessments, groupName) in courseData.groups"
+                             :key="groupName"
+                             class="group-section"
+                        >
+                            <div class="group-header">
+                                <h3>{{ groupName }}</h3>
+                            </div>
+
+                            <div class="group-assessments">
+                                <div v-for="assessment in assessments"
+                                     :key="assessment.id"
+                                     class="assessment-card"
+                                >
+                                    <div class="assessment-header">
+                                        <h4>{{ assessment.title }}</h4>
+                                        <span class="due-date" v-if="activeTab === 'pending'">
+                                            Due: {{ formatDate(assessment.dueDate) }}
+                                        </span>
+                                        <span class="completion-date" v-else>
+                                            Completed: {{ formatDate(assessment.completedDate) }}
+                                        </span>
+                                    </div>
+
+                                    <div class="assessment-content">
+                                        <p>{{ assessment.description }}</p>
+                                        <div class="completion-stats" v-if="!isStudent">
+                                            <div class="stats-row">
+                                                <span>Responses:</span>
+                                                <span class="stat-value">
+                                                    {{ assessment.responsesCount }}/{{ assessment.studentsCount }}
+                                                </span>
+                                            </div>
+                                            <div class="stats-row">
+                                                <span>With Feedback:</span>
+                                                <span class="stat-value">
+                                                    {{ assessment.feedbackCount }}/{{ assessment.studentsCount }}
+                                                </span>
+                                            </div>
+                                            <div class="progress-bar">
+                                                <div
+                                                    class="progress"
+                                                    :style="{ width: assessment.progress + '%' }"
+                                                ></div>
+                                            </div>
+                                        </div>
+                                        <div class="completion-stats" v-else>
+                                            <div class="progress-bar">
+                                                <div class="progress" :style="{ width: assessment.progress + '%' }"></div>
+                                            </div>
+                                            <p class="progress-text">{{ assessment.progress }}% Complete</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="assessment-footer">
+                                        <button class="view-button" @click="viewResults(assessment.id)">
+                                            <i class="fas fa-chart-bar"></i>
+                                            View Results
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="Object.keys(organizedAssessments).length === 0" class="empty-state">
+                    <i class="fas fa-tasks"></i>
+                    <h3>No {{ activeTab === 'pending' ? 'Pending' : 'Completed' }} Assessments</h3>
+                    <p>There are no {{ activeTab.toLowerCase() }} assessments in your courses.</p>
+                </div>
+            </div>
+
+            <!-- Student View -->
             <div v-else-if="activeTab === 'pending' && pendingAssessments.length > 0" class="assessments-grid">
                 <div v-for="assessment in pendingAssessments"
                      :key="assessment.id"
@@ -50,8 +139,11 @@
                         <p class="progress-text">{{ assessment.progress }}% Complete</p>
                     </div>
                     <div class="assessment-footer">
-                        <button class="start-button" @click="startAssessment(assessment.id)">
+                        <button v-if="isStudent" class="start-button" @click="startAssessment(assessment.id)">
                             Continue Assessment
+                        </button>
+                        <button v-else class="view-button" @click="viewResults(assessment.id)">
+                            View Assessment
                         </button>
                     </div>
                 </div>
@@ -82,6 +174,7 @@
                     </div>
                     <div class="assessment-footer">
                         <button class="view-button" @click="viewResults(assessment.id)">
+                            <i class="fas fa-chart-bar"></i>
                             View Results
                         </button>
                     </div>
@@ -140,18 +233,32 @@
                             </div>
 
                             <div class="form-group">
-                                <label for="group">Group *</label>
-                                <select
-                                    id="group"
-                                    v-model="newAssessment.groupId"
-                                    required
-                                    :disabled="!newAssessment.courseId"
-                                >
-                                    <option value="" disabled>Select a group</option>
-                                    <option v-for="group in groups" :key="group.id" :value="group.id">
-                                        {{ group.name }}
-                                    </option>
-                                </select>
+                                <label>Groups</label>
+                                <div class="groups-selection">
+                                    <button type="button" class="select-all-button" @click="toggleAllGroups">
+                                        {{ newAssessment.groupIds.length === groups.length ? 'Deselect All' : 'Select All Groups' }}
+                                    </button>
+
+                                    <div class="groups-grid" v-if="groups.length > 0">
+                                        <div v-for="group in groups" :key="group.id" class="group-checkbox">
+                                            <input
+                                                type="checkbox"
+                                                :id="'group-' + group.id"
+                                                :value="group.id"
+                                                v-model="newAssessment.groupIds"
+                                            >
+                                            <label :for="'group-' + group.id">{{ group.name }}</label>
+                                        </div>
+                                    </div>
+                                    <div v-else>
+                                        <p v-if="newAssessment.courseId" class="no-groups">
+                                            No groups available in this course
+                                        </p>
+                                        <p v-else class="select-course-hint">
+                                            Select a course to view available groups
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="form-group">
@@ -254,6 +361,7 @@ import { assessmentService, authService, courseService, groupService } from '../
 const router = useRouter();
 const activeTab = ref('pending');
 const isTeacher = ref(false);
+const isAdmin = ref(false);
 const pendingAssessments = ref([]);
 const completedAssessments = ref([]);
 const loading = ref(true);
@@ -266,7 +374,7 @@ const newAssessment = ref({
     title: '',
     description: '',
     courseId: '',
-    groupId: '',
+    groupIds: [],  // Changed from groupId to groupIds array
     dueDate: '',
     criteria: [
         {
@@ -282,7 +390,6 @@ const isFormValid = computed(() => {
     return newAssessment.value.title &&
            newAssessment.value.description &&
            newAssessment.value.courseId &&
-           newAssessment.value.groupId &&
            newAssessment.value.dueDate &&
            newAssessment.value.criteria.length > 0 &&
            newAssessment.value.criteria.every(c =>
@@ -321,7 +428,7 @@ const loadGroups = async () => {
 
         const { data } = await groupService.getGroups(newAssessment.value.courseId);
         groups.value = data;
-        newAssessment.value.groupId = ''; // Reset selected group
+        newAssessment.value.groupIds = []; // Reset selected groups
     } catch (error) {
         console.error('Error loading groups:', error);
     }
@@ -359,7 +466,7 @@ const createAssessment = async () => {
             title: '',
             description: '',
             courseId: '',
-            groupId: '',
+            groupIds: [],
             dueDate: '',
             criteria: [
                 {
@@ -385,39 +492,466 @@ const createAssessment = async () => {
     }
 };
 
+// Add function to toggle all groups selection
+const toggleAllGroups = () => {
+    if (newAssessment.value.groupIds.length === groups.value.length) {
+        newAssessment.value.groupIds = [];
+    } else {
+        newAssessment.value.groupIds = groups.value.map(g => g.id);
+    }
+};
+
+const isStudent = computed(() => {
+    return !isTeacher.value;
+});
+
+// Add new computed properties for organizing assessments
+const organizedAssessments = computed(() => {
+    if (!isTeacher.value) return {};
+
+    // Organize assessments by course and group
+    const organized = {};
+
+    // Process pending assessments
+    if (activeTab.value === 'pending') {
+        pendingAssessments.value.forEach(assessment => {
+            if (!organized[assessment.courseName]) {
+                organized[assessment.courseName] = {
+                    groups: {},
+                    courseId: assessment.courseId
+                };
+            }
+
+            if (!organized[assessment.courseName].groups[assessment.groupName]) {
+                organized[assessment.courseName].groups[assessment.groupName] = [];
+            }
+
+            // Check if assessment already exists in this group
+            const existingAssessment = organized[assessment.courseName].groups[assessment.groupName]
+                .find(a => a.title === assessment.title);
+
+            if (!existingAssessment) {
+                organized[assessment.courseName].groups[assessment.groupName].push({
+                    ...assessment,
+                    totalStudents: assessment.studentsCount,
+                    completedCount: assessment.responsesCount
+                });
+            }
+        });
+    } else {
+        // Process completed assessments
+        completedAssessments.value.forEach(assessment => {
+            if (!organized[assessment.courseName]) {
+                organized[assessment.courseName] = {
+                    groups: {},
+                    courseId: assessment.courseId
+                };
+            }
+
+            if (!organized[assessment.courseName].groups[assessment.groupName]) {
+                organized[assessment.courseName].groups[assessment.groupName] = [];
+            }
+
+            // Check if assessment already exists in this group
+            const existingAssessment = organized[assessment.courseName].groups[assessment.groupName]
+                .find(a => a.title === assessment.title);
+
+            if (!existingAssessment) {
+                organized[assessment.courseName].groups[assessment.groupName].push({
+                    ...assessment,
+                    totalStudents: assessment.studentsCount,
+                    completedCount: assessment.responsesCount
+                });
+            }
+        });
+    }
+
+    return organized;
+});
+
+// Update the onMounted hook
 onMounted(async () => {
     try {
         loading.value = true;
 
-        // Check if user is a teacher
+        // Check if user is a teacher or admin
         const { data: roleData } = await authService.checkUserRole();
         isTeacher.value = roleData.role === 'teacher' || roleData.role === 'admin';
+        isAdmin.value = roleData.role === 'admin';
 
+        // Load assessments based on user role
         if (isTeacher.value) {
-            // Load courses for teachers
-            await loadCourses();
+            // For teachers, load assessments linked to their courses
+            const { data: coursesData } = await courseService.getCourses(true);
+            courses.value = coursesData;
+
+            // Get assessments for teacher's courses
+            const pendingResponse = await assessmentService.getPendingAssessmentsForTeacher();
+            pendingAssessments.value = pendingResponse.data;
+
+            const completedResponse = await assessmentService.getCompletedAssessmentsForTeacher();
+            completedAssessments.value = completedResponse.data;
+        } else {
+            // For students, load their assessments
+            const pendingResponse = await assessmentService.getPendingAssessments();
+            pendingAssessments.value = pendingResponse.data;
+
+            const completedResponse = await assessmentService.getCompletedAssessments();
+            completedAssessments.value = completedResponse.data;
         }
-
-        // Fetch pending assessments
-        const pendingResponse = await assessmentService.getPendingAssessments();
-        pendingAssessments.value = pendingResponse.data;
-
-        // Fetch completed assessments
-        const completedResponse = await assessmentService.getCompletedAssessments();
-        completedAssessments.value = completedResponse.data;
     } catch (error) {
         console.error('Error fetching assessments:', error);
-        // Handle error states appropriately
     } finally {
         loading.value = false;
     }
 });
+
+const openCreateModal = () => {
+    console.log('Opening modal:', {
+        isTeacher: isTeacher.value,
+        isAdmin: isAdmin.value,
+        showCreateModal: showCreateModal.value
+    });
+    showCreateModal.value = true;
+    console.log('Modal state after click:', showCreateModal.value);
+};
 </script>
 
 <style scoped>
 .assessments-container {
     max-width: 1200px;
     margin: 0 auto;
+}
+
+/* Modal Overlay */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid #e1e1e1;
+}
+
+.modal-header h2 {
+    margin: 0;
+    color: #2c3e50;
+}
+
+.modal-header .close-button {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #7f8c8d;
+    padding: 0.5rem;
+    transition: color 0.2s ease;
+}
+
+.modal-header .close-button:hover {
+    color: #34495e;
+}
+
+/* Modal Layout */
+.modal-content {
+    background-color: white;
+    border-radius: 10px;
+    width: 90%;
+    max-width: 800px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-body {
+    padding: 2rem;
+}
+
+/* Modal Header */
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid #e1e1e1;
+}
+
+.modal-header h2 {
+    margin: 0;
+    color: #2c3e50;
+}
+
+.modal-header .close-button {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #7f8c8d;
+    padding: 0.5rem;
+    transition: color 0.2s ease;
+}
+
+.modal-header .close-button:hover {
+    color: #34495e;
+}
+
+/* Form Elements */
+.form-group {
+    margin-bottom: 1.5rem;
+    max-width: 100%;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 1rem;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+/* Groups Selection */
+.groups-selection {
+    border: 1px solid #e1e1e1;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-top: 0.5rem;
+    background-color: #f8f9fa;
+}
+
+.select-all-button {
+    background-color: #fff;
+    border: 1px solid #3498db;
+    color: #3498db;
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1.5rem;
+    cursor: pointer;
+    width: 100%;
+    max-width: 200px;
+    text-align: center;
+    transition: all 0.2s ease;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.select-all-button:hover {
+    background-color: #3498db;
+    color: white;
+}
+
+.groups-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1rem;
+    justify-content: center;
+    padding: 0 0.5rem;
+}
+
+.group-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background-color: white;
+    border: 1px solid #e1e1e1;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.group-checkbox:hover {
+    border-color: #3498db;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.group-checkbox input[type="checkbox"] {
+    margin: 0;
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.group-checkbox label {
+    margin: 0;
+    cursor: pointer;
+    font-size: 0.95rem;
+    color: #2c3e50;
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.no-groups, .select-course-hint {
+    text-align: center;
+    color: #6c757d;
+    margin: 2rem 0;
+    font-style: italic;
+}
+
+/* Assessment Criteria */
+.criterion-item {
+    background-color: white;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    border-radius: 8px;
+    border: 1px solid #e1e1e1;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.scores-range {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.scores-range .form-group {
+    margin-bottom: 0;
+}
+
+.scores-range input {
+    width: 100%;
+}
+
+/* Form Actions */
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.cancel-button {
+    padding: 0.75rem 1.5rem;
+    border: 1px solid #e74c3c;
+    background: white;
+    color: #e74c3c;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.cancel-button:hover {
+    background: #e74c3c;
+    color: white;
+}
+
+.create-button {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    background: #2ecc71;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.create-button:hover:not(:disabled) {
+    background: #27ae60;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.create-button:disabled {
+    background: #95a5a6;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+/* Criterion Buttons */
+.add-criterion-button {
+    width: 100%;
+    padding: 0.75rem;
+    background: #3498db;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    margin-top: 1rem;
+}
+
+.add-criterion-button:hover {
+    background: #2980b9;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.add-criterion-button i {
+    font-size: 0.9rem;
+}
+
+.criterion-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.criterion-header h4 {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 1.1rem;
+}
+
+.remove-button {
+    background: none;
+    border: none;
+    color: #e74c3c;
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    line-height: 1;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.remove-button:hover {
+    background: rgba(231, 76, 60, 0.1);
+    transform: scale(1.1);
+}
+
+.hint {
+    color: #7f8c8d;
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+    font-style: italic;
 }
 
 .header {
@@ -493,169 +1027,189 @@ onMounted(async () => {
     background: white;
     border-radius: 10px;
     padding: 1.5rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    border: 1px solid #e1e1e1;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.assessment-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 0.5rem;
+.assessment-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
 }
 
-.course-name {
-    color: #3498db;
-    font-size: 0.9rem;
-    margin: 0 0 1rem 0;
-}
-
-.progress-bar {
-    background-color: #ecf0f1;
-    border-radius: 10px;
-    height: 6px;
-    margin: 1rem 0;
-}
-
-.progress {
-    background-color: #3498db;
-    height: 100%;
-    border-radius: 10px;
-    transition: width 0.3s ease;
-}
-
-.stats {
-    display: flex;
-    justify-content: space-around;
-    margin: 1rem 0;
-}
-
-.stat {
-    text-align: center;
-}
-
-.label {
-    display: block;
-    color: #7f8c8d;
-    font-size: 0.8rem;
-}
-
-.value {
-    display: block;
-    color: #2c3e50;
-    font-weight: bold;
-    font-size: 1.2rem;
-}
-
-.assessment-footer {
-    margin-top: 1.5rem;
-    text-align: right;
-}
-
-.start-button, .view-button {
-    padding: 0.75rem 1.5rem;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    color: white;
-}
-
-.start-button {
-    background-color: #3498db;
-}
-
-.view-button {
-    background-color: #2c3e50;
-}
-
-/* Modal Styles */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-}
-
-.modal-content {
-    background-color: white;
-    border-radius: 10px;
-    width: 90%;
-    max-width: 700px;
-    max-height: 90vh;
-    overflow-y: auto;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-}
-
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1.5rem;
-    border-bottom: 1px solid #e1e1e1;
-}
-
-.modal-header h2 {
+.assessment-header h4 {
     margin: 0;
     color: #2c3e50;
+    font-size: 1.1rem;
 }
 
-.close-button {
-    background: none;
-    border: none;
+.due-date, .completion-date {
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.teacher-assessments {
+    margin-top: 2rem;
+}
+
+.course-section {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    margin-bottom: 2rem;
+    overflow: hidden;
+}
+
+.course-header {
+    background-color: #f8f9fa;
+    padding: 1.5rem;
+    border-bottom: 1px solid #e1e1e1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.course-header h2 {
+    margin: 0;
+    color: #2c3e50;
     font-size: 1.5rem;
-    cursor: pointer;
-    color: #7f8c8d;
 }
 
-.modal-body {
+.course-stats {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.group-count {
+    background-color: #e1e1e1;
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.groups-container {
     padding: 1.5rem;
 }
 
-.form-group {
+.group-section {
+    background-color: #fff;
+    border-radius: 8px;
+    border: 1px solid #e1e1e1;
     margin-bottom: 1.5rem;
 }
 
-.form-group label {
-    display: block;
-    margin-bottom: 0.5rem;
-    color: #2c3e50;
-    font-weight: 600;
+.group-header {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e1e1e1;
+    background-color: #f8f9fa;
 }
 
-.form-group input,
-.form-group textarea,
-.form-group select {
+.group-header h3 {
+    margin: 0;
+    color: #34495e;
+    font-size: 1.2rem;
+}
+
+.group-assessments {
+    padding: 1.5rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+}
+
+.completion-stats {
+    margin-top: 1rem;
+}
+
+.stats-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.stat-value {
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+/* Form Actions */
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.cancel-button {
+    padding: 0.75rem 1.5rem;
+    border: 1px solid #e74c3c;
+    background: white;
+    color: #e74c3c;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.cancel-button:hover {
+    background: #e74c3c;
+    color: white;
+}
+
+.create-button {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    background: #2ecc71;
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.create-button:hover:not(:disabled) {
+    background: #27ae60;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.create-button:disabled {
+    background: #95a5a6;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+/* Criterion Buttons */
+.add-criterion-button {
     width: 100%;
     padding: 0.75rem;
-    border: 1px solid #ddd;
+    background: #3498db;
+    color: white;
+    border: none;
     border-radius: 6px;
-    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    margin-top: 1rem;
 }
 
-.form-group textarea {
-    min-height: 100px;
-    resize: vertical;
+.add-criterion-button:hover {
+    background: #2980b9;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.criteria-section {
-    margin: 2rem 0;
-    border: 1px solid #e1e1e1;
-    border-radius: 8px;
-    padding: 1.5rem;
-    background-color: #f9f9f9;
-}
-
-.criterion-item {
-    background-color: white;
-    padding: 1.5rem;
-    margin-bottom: 1rem;
-    border-radius: 6px;
-    border: 1px solid #e1e1e1;
+.add-criterion-button i {
+    font-size: 0.9rem;
 }
 
 .criterion-header {
@@ -667,93 +1221,98 @@ onMounted(async () => {
 
 .criterion-header h4 {
     margin: 0;
+    color: #2c3e50;
+    font-size: 1.1rem;
 }
 
 .remove-button {
     background: none;
     border: none;
     color: #e74c3c;
-    font-size: 1.2rem;
+    font-size: 1.5rem;
     cursor: pointer;
+    padding: 0.25rem 0.5rem;
+    line-height: 1;
+    border-radius: 4px;
+    transition: all 0.2s ease;
 }
 
-.scores-range {
-    display: flex;
-    gap: 1rem;
-}
-
-.scores-range .form-group {
-    flex: 1;
+.remove-button:hover {
+    background: rgba(231, 76, 60, 0.1);
+    transform: scale(1.1);
 }
 
 .hint {
     color: #7f8c8d;
-    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
     font-style: italic;
 }
 
-.add-criterion-button {
-    background-color: #2ecc71;
-    color: white;
-    border: none;
-    padding: 0.75rem 1.5rem;
-    border-radius: 6px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin: 1rem 0 0;
-}
-
-.form-actions {
+.assessment-footer {
+    margin-top: 1.5rem;
+    text-align: right;
     display: flex;
     justify-content: flex-end;
     gap: 1rem;
-    margin-top: 2rem;
 }
 
-.cancel-button {
-    background-color: #95a5a6;
-    color: white;
-    border: none;
+.start-button, .view-button {
     padding: 0.75rem 1.5rem;
+    border: none;
     border-radius: 6px;
     cursor: pointer;
+    color: white;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.2s ease;
 }
 
-.create-button {
+.start-button {
     background-color: #3498db;
-    color: white;
-    border: none;
-    padding: 0.75rem 1.5rem;
-    border-radius: 6px;
-    cursor: pointer;
 }
 
-.create-button:disabled {
-    background-color: #bdc3c7;
-    cursor: not-allowed;
+.start-button:hover {
+    background-color: #2980b9;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-@media (max-width: 768px) {
-    .header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 1rem;
-    }
+.view-button {
+    background-color: #2c3e50;
+    position: relative;
+    overflow: hidden;
+}
 
-    .assessment-tabs {
-        width: 100%;
-    }
+.view-button:hover {
+    background-color: #34495e;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
 
-    .tab-button {
-        flex: 1;
-        padding: 0.75rem;
-    }
+.view-button:before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+        120deg,
+        transparent,
+        rgba(255, 255, 255, 0.2),
+        transparent
+    );
+    transition: 0.5s;
+}
 
-    .scores-range {
-        flex-direction: column;
-        gap: 0;
-    }
+.view-button:hover:before {
+    left: 100%;
+}
+
+.view-button i, .start-button i {
+    font-size: 1rem;
 }
 </style>

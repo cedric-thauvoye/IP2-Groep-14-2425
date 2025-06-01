@@ -322,6 +322,64 @@
           </div>
         </div>
       </div>
+
+      <!-- Delete Confirmation Modal -->
+      <div v-if="showDeleteModal" class="modal-overlay show">
+        <div class="modal-content confirmation-modal">
+          <div class="modal-header">
+            <h2>Confirm Deletion</h2>
+            <button class="close-button" @click="showDeleteModal = false">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="warning-icon">
+              <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <p class="confirmation-text">
+              Are you sure you want to delete the group "{{ group.name }}"?
+            </p>
+            <p class="permanent-note">This action cannot be undone.</p>
+            <div class="action-buttons">
+              <button class="cancel-button" @click="showDeleteModal = false">
+                Cancel
+              </button>
+              <button class="delete-button" @click="deleteGroup">
+                Delete Group
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Remove Student Confirmation Modal -->
+      <div v-if="showStudentDeleteModal" class="modal-overlay show">
+        <div class="modal-content confirmation-modal">
+          <div class="modal-header">
+            <h2>Confirm Student Removal</h2>
+            <button class="close-button" @click="showStudentDeleteModal = false">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="warning-icon">
+              <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <p class="confirmation-text">
+              Are you sure you want to remove {{ studentToDelete?.first_name }} {{ studentToDelete?.last_name }} from the group?
+            </p>
+            <p class="permanent-note">This action cannot be undone.</p>
+            <div class="action-buttons">
+              <button class="cancel-button" @click="showStudentDeleteModal = false">
+                Cancel
+              </button>
+              <button class="delete-button" @click="handleStudentRemoval">
+                Remove Student
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </PageLayout>
 </template>
@@ -331,9 +389,11 @@ import { ref, onMounted, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
 import { groupService, authService, assessmentService, userService } from '../services/api';
+import { useNotificationStore } from '../stores/notificationStore';
 
 const router = useRouter();
 const route = useRoute();
+const notificationStore = useNotificationStore();
 const group = ref({});
 const loading = ref(true);
 const error = ref(null);
@@ -347,21 +407,9 @@ const studentSearchQuery = ref('');
 const filteredStudents = ref([]);
 const showCreateAssessmentModal = ref(false);
 const submittingAssessment = ref(false);
-const newAssessment = ref({
-  title: '',
-  description: '',
-  dueDate: '',
-  groupId: '',
-  courseId: '',
-  criteria: [
-    {
-      name: 'Participation',
-      description: 'Level of participation in group activities',
-      minScore: 1,
-      maxScore: 10
-    }
-  ]
-});
+const showDeleteModal = ref(false);
+const showStudentDeleteModal = ref(false);
+const studentToDelete = ref(null);
 
 // Format date function
 const formatDate = (dateString) => {
@@ -404,19 +452,18 @@ const saveEditedGroup = async () => {
 
 // Delete group functionality
 const confirmDeleteGroup = () => {
-  if (confirm(`Are you sure you want to delete the group "${group.value.name}"?`)) {
-    deleteGroup();
-  }
+  showDeleteModal.value = true;
 };
 
 const deleteGroup = async () => {
   try {
     await groupService.deleteGroup(group.value.id);
-    // Redirect to groups page after successful deletion
     router.push('/groups');
   } catch (err) {
     console.error('Error deleting group:', err);
     error.value = 'Failed to delete group. Please try again.';
+  } finally {
+    showDeleteModal.value = false;
   }
 };
 
@@ -424,25 +471,45 @@ const deleteGroup = async () => {
 const addStudent = async (studentId) => {
   try {
     await groupService.addStudentToGroup(group.value.id, studentId);
-    // Refresh group data
-    fetchGroupDetails();
+    notificationStore.success('Student added to group successfully.');
+    // Refresh both group data and available students list
+    await Promise.all([
+      fetchGroupDetails(),
+      fetchAvailableStudents()
+    ]);
+    // Reset search query and refilter students
+    studentSearchQuery.value = '';
+    filterStudents();
   } catch (err) {
     console.error('Error adding student:', err);
-    error.value = 'Failed to add student. Please try again.';
+    notificationStore.error('Failed to add student. Please try again.');
   }
 };
 
-// Remove student from group
-const removeStudent = async (studentId) => {
-  if (confirm('Are you sure you want to remove this student from the group?')) {
-    try {
-      await groupService.removeStudentFromGroup(group.value.id, studentId);
-      // Refresh group data
-      fetchGroupDetails();
-    } catch (err) {
-      console.error('Error removing student:', err);
-      error.value = 'Failed to remove student. Please try again.';
-    }
+// Initialize student removal
+const removeStudent = (studentId) => {
+  studentToDelete.value = group.value.students.find(student => student.id === studentId);
+  showStudentDeleteModal.value = true;
+};
+
+// Handle student removal after confirmation
+const handleStudentRemoval = async () => {
+  if (!studentToDelete.value) return;
+
+  try {
+    await groupService.removeStudentFromGroup(group.value.id, studentToDelete.value.id);
+    notificationStore.success(`${studentToDelete.value.first_name} ${studentToDelete.value.last_name} has been removed from the group.`);
+    // Reset state
+    showStudentDeleteModal.value = false;
+    studentToDelete.value = null;
+    // Refresh both group data and available students list
+    await Promise.all([
+      fetchGroupDetails(),
+      fetchAvailableStudents()
+    ]);
+  } catch (err) {
+    console.error('Error removing student:', err);
+    notificationStore.error('Failed to remove student. Please try again.');
   }
 };
 
@@ -977,6 +1044,87 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.confirmation-modal {
+  max-width: 450px;
+}
+
+.warning-icon {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.warning-icon i {
+  color: #e74c3c;
+  font-size: 3rem;
+}
+
+.confirmation-text {
+  font-size: 1.1rem;
+  color: #2c3e50;
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.permanent-note {
+  color: #7f8c8d;
+  font-size: 0.9rem;
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.action-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.cancel-button {
+  background-color: #95a5a6;
+}
+
+.delete-button {
+  background-color: #e74c3c;
+}
+
+.cancel-button, .delete-button {
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.2s;
+}
+
+.cancel-button:hover {
+  background-color: #7f8c8d;
+}
+
+.delete-button:hover {
+  background-color: #c0392b;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: #7f8c8d;
+  transition: color 0.2s;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+}
+
+.close-button:hover {
+  color: #e74c3c;
+  background-color: #f8f9fa;
 }
 
 @media (max-width: 992px) {
