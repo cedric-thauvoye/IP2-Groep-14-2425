@@ -84,6 +84,7 @@ import { ref, onMounted, onBeforeUnmount, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import NavOption from './NavOption.vue';
 import { authService } from '../../services/api';
+import { logout } from '../../services/msalService';
 
 const user = ref(null);
 const isNavBarVisible = ref(false);
@@ -121,17 +122,21 @@ const getInitials = computed(() => {
 
 const signOutUser = async () => {
     try {
-        // Clear local tokens
+        console.log("User initiated logout...");
+
+        await logout();
+        user.value = null;
+
+    } catch (error) {
+        console.error("Sign out error:", error);
+
+        // Fallback: manually clear everything and redirect
         localStorage.removeItem('auth_token');
         localStorage.removeItem('user_data');
         user.value = null;
 
-        // Just navigate to login page, without Microsoft logout
-        router.push('/?logout=true');
-    } catch (error) {
-        console.error("Sign out error:", error);
-        // Fallback: force navigation to login
-        window.location.href = '/';
+        // Force navigation to login
+        window.location.href = '/?logout=true';
     }
 };
 

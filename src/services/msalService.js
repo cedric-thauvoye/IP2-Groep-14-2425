@@ -102,6 +102,16 @@ const createMsalInstance = () => {
         window.location.href = url;
         return Promise.resolve();
       },
+      logoutRedirect: () => {
+        console.log("Using fallback logoutRedirect");
+        // Clear local storage and redirect directly to our login page
+        // We avoid Microsoft's logout URL to prevent account selection page
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('user_data');
+        sessionStorage.clear();
+        window.location.href = redirectUri + '/?logout=true';
+        return Promise.resolve();
+      },
       acquireTokenSilent: () => Promise.reject(new Error('MSAL is not available')),
       acquireTokenRedirect: () => Promise.resolve(),
     };
