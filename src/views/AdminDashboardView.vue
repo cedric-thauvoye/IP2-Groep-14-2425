@@ -526,6 +526,21 @@
         </div>
       </div>
     </div>
+    <!-- Add User Modal -->
+<div v-if="showUserModal" class="modal-overlay">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Add New User</h2>
+      <button class="close-button" @click="showUserModal = false">
+        <i class="fas fa-times"></i>
+      </button>
+    </div>
+    <div class="modal-body">
+      <StudentDetailView @close="showUserModal = false" @created="fetchData"  />
+    </div>
+  </div>
+</div>
+
   </PageLayout>
 </template>
 
@@ -535,6 +550,10 @@ import { useRouter } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
 import { courseService, groupService, authService, userService } from '../services/api';
 import UserRoleDebug from '../components/Debug/UserRoleDebug.vue';
+import StudentDetailView from '@/views/StudentDetailView.vue';
+import { assessmentService } from '../services/api';
+
+
 
 const router = useRouter();
 const activeTab = ref('overview');
@@ -809,6 +828,15 @@ const fetchStats = async () => {
   try {
     // In a real implementation, you would have an API endpoint for admin stats
     // For now, we'll compute from our loaded data
+    const [pendingResponse, completedResponse] = await Promise.all([
+      assessmentService.getPendingAssessments(),
+      assessmentService.getCompletedAssessments()
+    ]);
+
+    const pendingCount = pendingResponse.data.length;
+    const completedCount = completedResponse.data.length;
+
+
     stats.value = {
       totalUsers: users.value.length,
       studentCount: users.value.filter(u => u.role === 'student').length,
@@ -817,9 +845,9 @@ const fetchStats = async () => {
       courseCount: courses.value.length,
       activeCoursesCount: courses.value.filter(c => c.status === 'active').length,
       groupCount: groups.value.length,
-      assessmentCount: 12, // Mock data
-      activeAssessmentsCount: 5, // Mock data
-      completedAssessmentsCount: 7 // Mock data
+      assessmentCount: pendingCount + completedCount,
+      activeAssessmentsCount: pendingCount,
+      completedAssessmentsCount: completedCount
     };
   } catch (error) {
     console.error('Error fetching stats:', error);
@@ -848,9 +876,9 @@ const fetchData = async () => {
     courses.value = coursesResponse.data.map(course => ({
       ...course,
       status: course.status || 'active', // Default to active if status not provided
-      studentCount: course.students?.length || 0,
-      teacherCount: course.teachers?.length || 0,
-      groupCount: course.groups?.length || 0
+      studentCount: course.student_count || 0,
+      teacherCount: course.teacher_count || 0,
+      groupCount: course.group_count || 0
     }));
     filteredCourses.value = [...courses.value];
 
@@ -1265,6 +1293,13 @@ onMounted(() => {
   justify-content: flex-end;
   gap: 1rem;
   margin-top: 1.5rem;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
 }
 
 .cancel-button {

@@ -124,6 +124,20 @@
             </form>
           </div>
         </div>
+        <!-- Add User Modal -->
+        <div v-if="showAddStudentModal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Add New User</h2>
+                    <button class="close-button" @click="showAddStudentModal = false">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            <div class="modal-body">
+            <StudentDetailView @close="showAddStudentModal = false" @created="fetchStudents"  />
+        </div>
+  </div>
+</div>
       </div>
     </div>
   </PageLayout>
@@ -134,6 +148,8 @@ import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
 import { userService, authService } from '../services/api';
+import StudentDetailView from '@/views/StudentDetailView.vue';
+
 
 const router = useRouter();
 const students = ref([]);

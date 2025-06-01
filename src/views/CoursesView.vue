@@ -439,6 +439,7 @@ onMounted(async () => {
 
 .view-button {
   background-color: #3498db;
+  border: 1px solid #3498db;
   color: white;
   text-decoration: none;
   padding: 0.5rem 1rem;
