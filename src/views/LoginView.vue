@@ -261,6 +261,7 @@ h1 {
     border: 1px solid #BDC3C7;
     border-radius: 6px;
     font-size: 16px;
+    box-sizing: border-box;
 }
 
 .login-button {
