@@ -2,7 +2,7 @@
     <div class="login-container">
         <div class="login-card">
             <div class="login-header">
-                <img src="https://placehold.co/50" alt="Logo" class="logo">
+                <img src="/logo.png" alt="Logo" class="logo">
                 <h1>Peer Assessment Tool</h1>
                 <p class="subtitle">Sign in with your Odisee account</p>
             </div>
@@ -226,7 +226,7 @@ onMounted(() => {
 }
 
 .logo {
-    width: 80px;
+    /*width: 80px;*/
     height: 80px;
     margin-bottom: 20px;
 }
