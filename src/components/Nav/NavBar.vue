@@ -10,7 +10,12 @@
 
             <!-- Profile Section -->
             <div class="profile" v-if="user">
-                <img :src="user.photoURL || 'https://placehold.co/50'" alt="User Avatar" class="avatar">
+                <div class="avatar" v-if="user.photoURL">
+                    <img :src="user.photoURL" alt="User Avatar" />
+                </div>
+                <div class="avatar initials" v-else>
+                     {{ getInitials }}
+                </div>
                 <div class="profile-info">
                     <p class="displayName">{{ user.firstName || user.first_name }} {{ user.lastName || user.last_name }}</p>
                     <p class="role">{{ userRole }}</p>
@@ -75,7 +80,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue';
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import NavOption from './NavOption.vue';
 import { authService } from '../../services/api';
@@ -106,6 +111,13 @@ window.addEventListener('resize', updateScreenSize);
 onBeforeUnmount(() => {
     window.removeEventListener('resize', updateScreenSize);
 });
+
+const getInitials = computed(() => {
+  const first = user.value.firstName || user.value.first_name || '';
+  const last = user.value.lastName || user.value.last_name || '';
+  return `${first?.[0] || ''}${last?.[0] || ''}`.toUpperCase();
+});
+
 
 const signOutUser = async () => {
     try {
@@ -266,10 +278,29 @@ onMounted(async () => {
     margin: 5px 0 0 0;
 }
 
-.profile .avatar {
-    width: 50px;
-    border-radius: 50%;
+.avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar.initials {
+  background-color: #ccc;
+  color: #fff;
+  font-weight: bold;
+  font-size: 18px;
+}
+
 
 /* NAV OPTIONS */
 .navOptions {
