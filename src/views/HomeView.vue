@@ -23,14 +23,28 @@
                         <p class="stat-number">{{ groups.length }}</p>
                     </div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card" v-if="isTeacher">
+                    <i class="fas fa-user-graduate"></i>
+                    <div class="stat-content">
+                        <h3>My Students</h3>
+                        <p class="stat-number">{{ totalStudents }}</p>
+                    </div>
+                </div>
+                <div class="stat-card" v-if="isTeacher">
+                    <i class="fas fa-clipboard-check"></i>
+                    <div class="stat-content">
+                        <h3>Created Assessments</h3>
+                        <p class="stat-number">{{ createdAssessments.length }}</p>
+                    </div>
+                </div>
+                <div class="stat-card" v-if="!isTeacher">
                     <i class="fas fa-tasks"></i>
                     <div class="stat-content">
                         <h3>Pending Assessments</h3>
                         <p class="stat-number">{{ pendingAssessments.length }}</p>
                     </div>
                 </div>
-                <div class="stat-card">
+                <div class="stat-card" v-if="!isTeacher">
                     <i class="fas fa-chart-line"></i>
                     <div class="stat-content">
                         <h3>Completed Assessments</h3>
@@ -65,29 +79,6 @@
                         <p v-else class="no-data">You are not enrolled in any courses.</p>
                     </div>
                 </div>
-
-                <!-- Recent Activity Section -->
-                <div class="content-card activity-section">
-                    <div class="card-header">
-                        <h2><i class="fas fa-history"></i> Recent Activity</h2>
-                    </div>
-                    <div class="card-content">
-                        <div class="activity-timeline">
-                            <div v-for="(activity, index) in recentActivities"
-                                 :key="index"
-                                 class="activity-item"
-                            >
-                                <div class="activity-icon" :class="activity.type">
-                                    <i :class="activity.icon"></i>
-                                </div>
-                                <div class="activity-details">
-                                    <p class="activity-text">{{ activity.text }}</p>
-                                    <span class="activity-time">{{ activity.time }}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
         </div>
         <div v-else class="loading-screen">
@@ -101,34 +92,17 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
-import { authService, courseService, groupService, assessmentService } from '../services/api';
+import { authService, courseService, groupService, assessmentService, userService } from '../services/api';
 
 const router = useRouter();
 const user = ref(null);
+const isTeacher = ref(false);
 const courses = ref([]);
 const groups = ref([]);
 const pendingAssessments = ref([]);
 const completedAssessments = ref([]);
-const recentActivities = ref([
-    {
-        type: 'assessment',
-        icon: 'fas fa-tasks',
-        text: 'Completed peer assessment for Web Development',
-        time: '2 hours ago'
-    },
-    {
-        type: 'course',
-        icon: 'fas fa-book',
-        text: 'Joined new course: Advanced Programming',
-        time: '1 day ago'
-    },
-    {
-        type: 'group',
-        icon: 'fas fa-users',
-        text: 'Added to group: Project Team 3',
-        time: '2 days ago'
-    }
-]);
+const createdAssessments = ref([]);
+const totalStudents = ref(0);
 
 const getCurrentDateTime = () => {
     const now = new Date();
@@ -150,7 +124,7 @@ onMounted(async () => {
             return;
         }
 
-        // Get current user
+        // Get current user and check role
         const userResponse = await authService.getCurrentUser();
         console.log('User data received:', userResponse.data);
 
@@ -159,25 +133,76 @@ onMounted(async () => {
             ...userResponse.data.user,
             firstName: userResponse.data.user.first_name || userResponse.data.user.firstName,
             lastName: userResponse.data.user.last_name || userResponse.data.user.lastName,
-            // Add any other properties that might have different naming
         };
 
-        // Fetch courses
-        const coursesResponse = await courseService.getCourses();
-        console.log('Courses data received:', coursesResponse.data);
-        courses.value = coursesResponse.data;
+        // Check user role
+        const roleResponse = await authService.checkUserRole();
+        isTeacher.value = roleResponse.data.role === 'teacher' || roleResponse.data.role === 'admin';
+
+        // Fetch courses based on role
+        if (isTeacher.value) {
+            // For teachers, get courses they teach
+            const coursesResponse = await courseService.getCourses(true);
+            courses.value = coursesResponse.data;
+        } else {
+            // For students, get courses they're enrolled in
+            const coursesResponse = await courseService.getCourses();
+            courses.value = coursesResponse.data;
+        }
 
         // Fetch groups
         const groupsResponse = await groupService.getGroups();
         groups.value = groupsResponse.data;
 
-        // Fetch pending assessments
-        const pendingResponse = await assessmentService.getPendingAssessments();
-        pendingAssessments.value = pendingResponse.data;
+        if (isTeacher.value) {
+            // For teachers, fetch different data
+            try {
+                // Option 1: Get students from teacher's courses (current implementation)
+                let allStudents = new Set();
+                for (const course of courses.value) {
+                    const courseDetailResponse = await courseService.getCourseById(course.id);
+                    const courseStudents = courseDetailResponse.data.students || [];
+                    courseStudents.forEach(student => allStudents.add(student.id));
+                }
+                totalStudents.value = allStudents.size;
 
-        // Fetch completed assessments
-        const completedResponse = await assessmentService.getCompletedAssessments();
-        completedAssessments.value = completedResponse.data;
+                // Option 2: Get total students in the system (uncomment if you want this instead)
+                // const allStudentsResponse = await userService.getStudents();
+                // totalStudents.value = allStudentsResponse.data.length;
+
+                // Get all assessments created by this teacher
+                const allAssessments = [];
+                for (const group of groups.value) {
+                    try {
+                        const groupDetailResponse = await groupService.getGroupById(group.id);
+                        const groupAssessments = groupDetailResponse.data.assessments || [];
+                        allAssessments.push(...groupAssessments);
+                    } catch (groupError) {
+                        console.log('Could not fetch assessments for group:', group.id);
+                    }
+                }
+                createdAssessments.value = allAssessments;
+
+            } catch (teacherDataError) {
+                console.error('Error fetching teacher-specific data:', teacherDataError);
+                totalStudents.value = 0;
+                createdAssessments.value = [];
+            }
+        } else {
+            // For students, fetch pending and completed assessments
+            try {
+                const pendingResponse = await assessmentService.getPendingAssessments();
+                pendingAssessments.value = pendingResponse.data;
+
+                const completedResponse = await assessmentService.getCompletedAssessments();
+                completedAssessments.value = completedResponse.data;
+
+            } catch (studentDataError) {
+                console.error('Error fetching student assessments:', studentDataError);
+                pendingAssessments.value = [];
+                completedAssessments.value = [];
+            }
+        }
 
     } catch (error) {
         console.error('Error loading dashboard data:', error);
@@ -247,7 +272,7 @@ onMounted(async () => {
 
 .content-grid {
     display: grid;
-    grid-template-columns: 3fr 2fr;
+    grid-template-columns: 1fr;
     gap: 1.5rem;
 }
 
@@ -320,42 +345,7 @@ onMounted(async () => {
     font-size: 0.9rem;
 }
 
-.activity-timeline {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
 
-.activity-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 1rem;
-}
-
-.activity-icon {
-    width: 2rem;
-    height: 2rem;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #e8f4fd;
-    color: #3498db;
-}
-
-.activity-details {
-    flex: 1;
-}
-
-.activity-text {
-    margin: 0;
-    color: #2c3e50;
-}
-
-.activity-time {
-    font-size: 0.8rem;
-    color: #7f8c8d;
-}
 
 .loading-screen {
     display: flex;
