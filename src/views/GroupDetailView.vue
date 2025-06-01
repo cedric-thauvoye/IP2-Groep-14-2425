@@ -42,7 +42,7 @@
           <div class="details-card students-section">
             <div class="card-header">
               <h2><i class="fas fa-users"></i> Students</h2>
-              <button v-if="isTeacher" class="add-button" @click="showAddStudentModal = true">
+              <button v-if="isTeacher" class="add-button" @click="openAddStudentModal">
                 <i class="fas fa-plus"></i> Add Student
               </button>
             </div>
@@ -473,10 +473,11 @@ const addStudent = async (studentId) => {
     await groupService.addStudentToGroup(group.value.id, studentId);
     notificationStore.success('Student added to group successfully.');
     // Refresh both group data and available students list
-    await Promise.all([
-      fetchGroupDetails(),
-      fetchAvailableStudents()
-    ]);
+    const promises = [fetchGroupDetails()];
+    if (isTeacher.value) {
+      promises.push(fetchAvailableStudents());
+    }
+    await Promise.all(promises);
     // Reset search query and refilter students
     studentSearchQuery.value = '';
     filterStudents();
@@ -503,10 +504,11 @@ const handleStudentRemoval = async () => {
     showStudentDeleteModal.value = false;
     studentToDelete.value = null;
     // Refresh both group data and available students list
-    await Promise.all([
-      fetchGroupDetails(),
-      fetchAvailableStudents()
-    ]);
+    const promises = [fetchGroupDetails()];
+    if (isTeacher.value) {
+      promises.push(fetchAvailableStudents());
+    }
+    await Promise.all(promises);
   } catch (err) {
     console.error('Error removing student:', err);
     notificationStore.error('Failed to remove student. Please try again.');
@@ -648,7 +650,8 @@ const fetchAvailableStudents = async () => {
     filteredStudents.value = response.data;
   } catch (err) {
     console.error('Error fetching available students:', err);
-    error.value = 'Failed to load available students. Please try again.';
+    availableStudents.value = [];
+    filteredStudents.value = [];
   } finally {
     loadingStudents.value = false;
   }
@@ -675,10 +678,21 @@ const checkUserRole = async () => {
   }
 };
 
+// Open add student modal (teachers only)
+const openAddStudentModal = async () => {
+  if (isTeacher.value) {
+    showAddStudentModal.value = true;
+    await fetchAvailableStudents();
+  }
+};
+
 onMounted(async () => {
   await checkUserRole();
   await fetchGroupDetails();
-  await fetchAvailableStudents();
+  // Only fetch available students for teachers who can add students to groups
+  if (isTeacher.value) {
+    await fetchAvailableStudents();
+  }
 });
 </script>
 
