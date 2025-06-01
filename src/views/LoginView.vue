@@ -11,11 +11,11 @@
                 <i class="fas fa-circle-notch fa-spin"></i>
                 <p>Logging in...</p>
             </div>
-            <div v-else-if="authError" class="error-message">
-                <i class="fas fa-exclamation-circle"></i>
-                <p>{{ authError }}</p>
-            </div>
             <div v-else class="login-content">
+                <div v-if="authError" class="error-message">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <p>{{ authError }}</p>
+                </div>
                 <form @submit.prevent="handleLogin">
                     <div class="form-group">
                         <label for="email">Email</label>
