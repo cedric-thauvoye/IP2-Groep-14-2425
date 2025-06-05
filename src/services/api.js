@@ -104,14 +104,19 @@ export const userService = {
 
 // Import services
 export const importService = {
-  importStudents: (formData) => apiClient.post('/import/students', formData, {
+  previewStudents: (formData) => apiClient.post('/import/students/preview', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
+  importStudents: (studentsData) => apiClient.post('/import/students', { students: studentsData }),
   importGroups: (formData) => apiClient.post('/import/groups', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
-  getStudentTemplate: () => apiClient.get('/import/template/students'),
-  getGroupTemplate: () => apiClient.get('/import/template/groups'),
+  getStudentTemplate: () => apiClient.get('/import/template/students', {
+    responseType: 'blob'
+  }),
+  getGroupTemplate: () => apiClient.get('/import/template/groups', {
+    responseType: 'blob'
+  }),
 };
 
 export default {

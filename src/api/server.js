@@ -101,14 +101,16 @@ const authRoutes = require('./routes/auth')(pool, jwt, bcrypt);
 const courseRoutes = require('./routes/courses')(pool);
 const groupRoutes = require('./routes/groups')(pool);
 const assessmentRoutes = require('./routes/assessments')(pool);
-const userRoutes = require('./routes/users')(pool); // Add this line
+const userRoutes = require('./routes/users')(pool);
+const importRoutes = require('./routes/import')(pool, bcrypt);
 
 // Use routes
 app.use('/auth', authRoutes);
 app.use('/courses', courseRoutes);
 app.use('/groups', groupRoutes);
 app.use('/assessments', assessmentRoutes);
-app.use('/users', userRoutes); // Add this line
+app.use('/users', userRoutes);
+app.use('/import', importRoutes);
 
 // Root route for API health check
 app.get('/health', (req, res) => {
