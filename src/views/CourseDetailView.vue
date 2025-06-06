@@ -218,46 +218,56 @@
         <div v-if="showAddStudentModal" class="modal-overlay">
           <div class="modal-content">
             <div class="modal-header">
-              <h2>Add Student</h2>
+              <h2>Add Student to Course</h2>
               <button class="close-button" @click="showAddStudentModal = false">
                 <i class="fas fa-times"></i>
               </button>
             </div>
             <div class="modal-body">
               <div v-if="loadingStudents" class="loading-indicator">
-                <i class="fas fa-spinner fa-spin"></i> Loading students...
+                <i class="fas fa-spinner fa-spin"></i>
+                <span>Loading students...</span>
+              </div>
+              <div v-else-if="filteredAvailableStudents.length === 0" class="no-students">
+                <p>No available students to add to this course.</p>
               </div>
               <div v-else>
                 <div class="search-box">
                   <i class="fas fa-search"></i>
                   <input
                     type="text"
-                    placeholder="Search students..."
                     v-model="availableStudentSearch"
+                    placeholder="Search students..."
+                    @input="filterAvailableStudents"
                   >
                 </div>
 
-                <div class="students-list">
+                <div class="students-select-list">
                   <div
                     v-for="student in filteredAvailableStudents"
                     :key="student.id"
-                    class="student-option"
-                    @click="addStudentToCourse(student.id)"
+                    class="student-select-item"
                   >
-                    <div class="student-avatar">
-                      {{ getInitials(student.first_name, student.last_name) }}
-                    </div>
                     <div class="student-info">
-                      <h3>{{ student.first_name }} {{ student.last_name }}</h3>
-                      <p>{{ student.email }}</p>
-                      <p v-if="student.q_number" class="student-id">{{ student.q_number }}</p>
+                      <div class="student-avatar">
+                        {{ getInitials(student.first_name, student.last_name) }}
+                      </div>
+                      <div class="student-details">
+                        <h3>{{ student.first_name }} {{ student.last_name }}</h3>
+                        <p class="student-email">{{ student.email }}</p>
+                        <p class="student-id">{{ student.q_number }}</p>
+                      </div>
                     </div>
+                    <button class="add-student-button" @click="addStudentToCourse(student.id)">
+                      <i class="fas fa-plus"></i> Add
+                    </button>
                   </div>
                 </div>
-
-                <div v-if="filteredAvailableStudents.length === 0" class="no-results">
-                  No students found matching your search
-                </div>
+              </div>
+              <div class="form-actions">
+                <button type="button" class="cancel-button" @click="showAddStudentModal = false">
+                  Close
+                </button>
               </div>
             </div>
           </div>
@@ -578,6 +588,7 @@ const availableTeachers = ref([]);
 const loadingTeachers = ref(false);
 const teacherSearch = ref('');
 const availableStudentSearch = ref('');
+const allAvailableStudents = ref([]);
 const filteredAvailableStudents = ref([]);
 const loadingStudents = ref(false);
 const newGroup = ref({ name: '', studentIds: [] });
@@ -628,11 +639,11 @@ const filteredTeachers = computed(() => {
 const filterAvailableStudents = () => {
   const searchTerm = availableStudentSearch.value.toLowerCase();
   if (!searchTerm) {
-    filteredAvailableStudents.value = course.value.students;
+    filteredAvailableStudents.value = allAvailableStudents.value;
     return;
   }
 
-  filteredAvailableStudents.value = course.value.students.filter(student => {
+  filteredAvailableStudents.value = allAvailableStudents.value.filter(student => {
     return student.first_name.toLowerCase().includes(searchTerm) ||
            student.last_name.toLowerCase().includes(searchTerm) ||
            student.email.toLowerCase().includes(searchTerm) ||
@@ -671,6 +682,7 @@ const fetchAvailableStudents = async () => {
     const response = await userService.getStudents();
     const currentStudentIds = course.value.students.map(s => s.id);
     const availableStudents = response.data.filter(s => !currentStudentIds.includes(s.id));
+    allAvailableStudents.value = availableStudents;
     filteredAvailableStudents.value = availableStudents;
   } catch (error) {
     console.error('Error fetching students:', error);
@@ -888,6 +900,10 @@ const fetchCourseDetails = async () => {
 
     if (course.value.students) {
       filteredStudents.value = [...course.value.students];
+      // Re-apply search filter if there's an active search
+      if (studentSearch.value) {
+        filterStudents();
+      }
     }
   } catch (err) {
     console.error('Error fetching course details:', err);
@@ -1042,44 +1058,62 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 1rem;
+  flex-wrap: wrap;
 }
 
 .search-box {
   position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  max-width: 300px;
 }
 
 .search-box i {
   position: absolute;
-  left: 10px;
+  left: 1rem;
   top: 50%;
   transform: translateY(-50%);
   color: #7f8c8d;
+  z-index: 1;
 }
 
 .search-box input {
-  padding: 0.5rem 0.5rem 0.5rem 2rem;
+  width: 100%;
+  padding: 0.75rem 1rem 0.75rem 2.5rem;
   border: 1px solid #ddd;
-  border-radius: 5px;
-  width: 200px;
+  border-radius: 8px;
+  font-size: 1rem;
+  line-height: 1.2;
+  box-sizing: border-box;
 }
 
 .add-button {
   background-color: #3498db;
   color: white;
   border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 0.5rem;
   font-size: 0.9rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .teachers-list, .students-list {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.75rem;
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 0.5rem;
+  border: 1px solid #e1e8ed;
+  border-radius: 8px;
+  background: #fafbfc;
 }
 
 .teacher-item, .student-item {
@@ -1089,12 +1123,19 @@ onMounted(async () => {
   padding: 1rem;
   border-radius: 8px;
   background: #f8f9fa;
+  gap: 1rem;
+}
+
+.student-actions {
+  flex-shrink: 0;
 }
 
 .teacher-info, .student-info {
   display: flex;
   align-items: center;
   gap: 1rem;
+  flex: 1;
+  min-width: 0;
 }
 
 .teacher-avatar, .student-avatar {
@@ -1107,17 +1148,30 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   font-weight: bold;
+  flex-shrink: 0;
+  font-size: 0.9rem;
+}
+
+.teacher-details, .student-details {
+  flex: 1;
+  min-width: 0;
 }
 
 .teacher-details h3, .student-details h3 {
   margin: 0;
   font-size: 1rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .teacher-email, .student-email, .student-id {
   margin: 0.25rem 0 0 0;
   font-size: 0.8rem;
   color: #7f8c8d;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .remove-button {
@@ -1227,7 +1281,7 @@ onMounted(async () => {
 .modal-content {
   background: white;
   border-radius: 10px;
-  width: 500px;
+  width: 600px;
   max-width: 90%;
   max-height: 80vh;
   overflow-y: auto;
@@ -1250,18 +1304,65 @@ onMounted(async () => {
   padding: 1.5rem;
 }
 
-.teacher-option {
+.modal-body .search-box {
+  margin-bottom: 1rem;
+}
+
+.modal-body .search-box input {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.modal-body .students-list {
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid #e1e8ed;
+  border-radius: 8px;
+  background: #fafbfc;
+  padding: 0.5rem;
+}
+
+.teacher-option, .student-option {
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 0.75rem;
+  padding: 1rem;
   border-radius: 8px;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+  background: #fff;
+  margin-bottom: 0.5rem;
 }
 
-.teacher-option:hover {
+.teacher-option:hover, .student-option:hover {
   background-color: #f8f9fa;
+  border-color: #e1e8ed;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.student-option .student-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.student-option .student-info h3 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.student-option .student-info p {
+  margin: 0.25rem 0;
+  font-size: 0.8rem;
+  color: #7f8c8d;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .loading-indicator {
@@ -1272,8 +1373,64 @@ onMounted(async () => {
 
 .no-results {
   text-align: center;
-  padding: 1rem;
+  padding: 2rem;
   color: #7f8c8d;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px dashed #ddd;
+  font-style: italic;
+}
+
+.students-select-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.student-select-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-radius: 8px;
+  background: #f8f9fa;
+}
+
+.add-student-button {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Modal search box specific styles */
+.modal-body .search-box {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  position: relative;
+}
+
+.modal-body .search-box i {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #7f8c8d;
+  z-index: 1;
+}
+
+.modal-body .search-box input {
+  flex: 1;
+  padding: 0.75rem 1rem 0.75rem 2.5rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
 }
 
 .form-group {
@@ -1354,24 +1511,11 @@ onMounted(async () => {
   margin-top: 0.5rem;
 }
 
-.student-option {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.5rem;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.student-option:hover {
-  background-color: #f8f9fa;
-}
-
 .student-avatar.small {
   width: 30px;
   height: 30px;
   font-size: 0.8rem;
+  flex-shrink: 0;
 }
 
 .no-students-message {
@@ -1473,8 +1617,8 @@ onMounted(async () => {
 @media (max-width: 768px) {
   .header-actions {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
+    align-items: stretch;
+    gap: 0.75rem;
   }
 
   .search-box {
@@ -1483,6 +1627,19 @@ onMounted(async () => {
 
   .search-box input {
     width: 100%;
+  }
+
+  .add-button {
+    align-self: flex-start;
+  }
+
+  .modal-content {
+    width: 95%;
+    margin: 1rem;
+  }
+
+  .modal-body {
+    padding: 1rem;
   }
 }
 </style>
