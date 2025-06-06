@@ -132,7 +132,7 @@ module.exports = (pool, bcrypt) => {
         Object.keys(row).forEach(key => {
           const lowerKey = key.toLowerCase().trim();
 
-          // Email mapping
+          // Email mapping (for students)
           if (lowerKey.includes('email') || lowerKey.includes('e-mail') || lowerKey.includes('mail')) {
             normalizedRow['Email'] = row[key];
           }
@@ -141,6 +141,7 @@ module.exports = (pool, bcrypt) => {
                    lowerKey === 'firstname' || lowerKey === 'first_name' ||
                    lowerKey === 'voornaam' || lowerKey === 'prenom') {
             normalizedRow['First Name'] = row[key];
+            normalizedRow['first name'] = row[key]; // For groups
           }
           // Last name mapping
           else if (lowerKey.includes('last') && lowerKey.includes('name') ||
@@ -148,13 +149,25 @@ module.exports = (pool, bcrypt) => {
                    lowerKey === 'surname' || lowerKey === 'achternaam' ||
                    lowerKey === 'nom' || lowerKey === 'family_name') {
             normalizedRow['Last Name'] = row[key];
+            normalizedRow['last name'] = row[key]; // For groups
           }
-          // Q Number mapping
+          // Q Number mapping (for students)
           else if (lowerKey.includes('q') && (lowerKey.includes('number') || lowerKey.includes('num')) ||
                    lowerKey === 'qnumber' || lowerKey === 'q_number' ||
-                   lowerKey === 'student_id' || lowerKey === 'studentid' ||
-                   lowerKey === 'user_id' || lowerKey === 'userid' || lowerKey === 'user id') {
+                   lowerKey === 'student_id' || lowerKey === 'studentid') {
             normalizedRow['Q Number'] = row[key];
+          }
+          // User ID mapping (for groups)
+          else if (lowerKey === 'user_id' || lowerKey === 'userid' || lowerKey === 'user id') {
+            normalizedRow['user id'] = row[key];
+          }
+          // Group name mapping
+          else if (lowerKey === 'group_name' || lowerKey === 'groupname' || lowerKey === 'group name') {
+            normalizedRow['group name'] = row[key];
+          }
+          // Group set name mapping (optional)
+          else if (lowerKey === 'group_set_name' || lowerKey === 'groupsetname' || lowerKey === 'group set name') {
+            normalizedRow['group set name'] = row[key];
           }
           // Keep original key as backup
           else {
@@ -188,6 +201,54 @@ module.exports = (pool, bcrypt) => {
     } else {
       return await parseCSVFromBuffer(file.buffer);
     }
+  };
+
+  // Validate group data
+  const validateGroupData = (groups, courseId) => {
+    const errors = [];
+    const groupMap = new Map(); // Track groups and their students
+
+    groups.forEach((group, index) => {
+      const rowNum = index + 1;
+
+      // Check required fields
+      if (!group['group name'] || !group['group name'].trim()) {
+        errors.push(`Row ${rowNum}: Group name is required`);
+      }
+
+      if (!group['user id'] || !group['user id'].trim()) {
+        errors.push(`Row ${rowNum}: User ID is required`);
+      } else if (!/^q\d+$/i.test(group['user id'].trim())) {
+        errors.push(`Row ${rowNum}: User ID must start with 'q' followed by numbers`);
+      }
+
+      if (!group['first name'] || !group['first name'].trim()) {
+        errors.push(`Row ${rowNum}: First name is required`);
+      }
+
+      if (!group['last name'] || !group['last name'].trim()) {
+        errors.push(`Row ${rowNum}: Last name is required`);
+      }
+
+      // Track group membership to detect duplicates
+      if (group['group name']?.trim() && group['user id']?.trim()) {
+        const groupName = group['group name'].trim();
+        const userId = group['user id'].trim().toLowerCase();
+
+        if (!groupMap.has(groupName)) {
+          groupMap.set(groupName, new Set());
+        }
+
+        const groupMembers = groupMap.get(groupName);
+        if (groupMembers.has(userId)) {
+          errors.push(`Row ${rowNum}: Student ${group['user id']} is already in group "${groupName}"`);
+        } else {
+          groupMembers.add(userId);
+        }
+      }
+    });
+
+    return errors;
   };
 
   // Validate student data
@@ -419,6 +480,302 @@ module.exports = (pool, bcrypt) => {
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename="student_import_template.csv"');
     res.send(csvContent);
+  });
+
+  // Preview groups import
+  router.post('/groups/preview', authenticateToken, requireTeacherOrAdmin, upload.single('file'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ message: 'No file uploaded' });
+      }
+
+      const { courseId } = req.body;
+      if (!courseId) {
+        return res.status(400).json({ message: 'Course ID is required for group import' });
+      }
+
+      // Parse file (only XLSX for groups)
+      const groups = await parseFileData(req.file);
+
+      console.log('Parsed groups count:', groups.length);
+      if (groups.length > 0) {
+        console.log('First group object:', groups[0]);
+        console.log('Group object keys:', Object.keys(groups[0]));
+      }
+
+      if (groups.length === 0) {
+        return res.status(400).json({ message: 'File is empty or invalid' });
+      }
+
+      // Validate data
+      const validationErrors = validateGroupData(groups, courseId);
+
+      const conn = await pool.getConnection();
+
+      try {
+        // Check if course exists and user has access
+        if (req.user.role === 'teacher') {
+          const [courseAccess] = await conn.execute(
+            'SELECT 1 FROM course_teachers WHERE course_id = ? AND teacher_id = ?',
+            [courseId, req.user.id]
+          );
+
+          if (courseAccess.length === 0) {
+            conn.release();
+            return res.status(403).json({ message: 'You do not have access to this course' });
+          }
+        }
+
+        // Check for existing students by Q number in the database
+        const userIds = groups.map(g => g['user id']?.trim().toLowerCase()).filter(Boolean);
+        let existingUsers = [];
+
+        if (userIds.length > 0) {
+          const [userResults] = await conn.execute(
+            `SELECT q_number, id FROM users WHERE LOWER(q_number) IN (${userIds.map(() => '?').join(',')})`,
+            userIds
+          );
+          existingUsers = userResults;
+        }
+
+        // Check if students are enrolled in the course
+        const existingUserIds = existingUsers.map(u => u.id);
+        let enrolledUsers = [];
+
+        if (existingUserIds.length > 0) {
+          const [enrolledResults] = await conn.execute(
+            `SELECT student_id FROM course_students WHERE course_id = ? AND student_id IN (${existingUserIds.map(() => '?').join(',')})`,
+            [courseId, ...existingUserIds]
+          );
+          enrolledUsers = enrolledResults.map(r => r.student_id);
+        }
+
+        conn.release();
+
+        // Create lookup maps
+        const existingUserMap = new Map(existingUsers.map(u => [u.q_number.toLowerCase(), u.id]));
+        const enrolledUserSet = new Set(enrolledUsers);
+
+        // Add validation errors for missing or non-enrolled students
+        groups.forEach((group, index) => {
+          if (group['user id']) {
+            const userId = group['user id'].trim().toLowerCase();
+            const userDbId = existingUserMap.get(userId);
+
+            if (!userDbId) {
+              validationErrors.push(`Row ${index + 1}: Student with Q Number ${group['user id']} does not exist in the system`);
+            } else if (!enrolledUserSet.has(userDbId)) {
+              validationErrors.push(`Row ${index + 1}: Student ${group['user id']} is not enrolled in the selected course`);
+            }
+          }
+        });
+
+        // Prepare preview data
+        const previewData = groups.map((group, index) => ({
+          row: index + 1,
+          groupName: group['group name']?.trim() || '',
+          userId: group['user id']?.trim() || '',
+          firstName: group['first name']?.trim() || '',
+          lastName: group['last name']?.trim() || '',
+          isValid: !validationErrors.some(error => error.includes(`Row ${index + 1}`))
+        }));
+
+        res.json({
+          preview: previewData,
+          totalRows: groups.length,
+          validRows: previewData.filter(row => row.isValid).length,
+          errors: validationErrors,
+          isValid: validationErrors.length === 0
+        });
+
+      } catch (dbError) {
+        conn.release();
+        throw dbError;
+      }
+
+    } catch (error) {
+      console.error('Error previewing group import:', error);
+      res.status(500).json({ message: 'Error processing file: ' + error.message });
+    }
+  });
+
+  // Import groups (bulk)
+  router.post('/groups', authenticateToken, requireTeacherOrAdmin, async (req, res) => {
+    try {
+      const { courseId, groups } = req.body;
+
+      if (!courseId) {
+        return res.status(400).json({ message: 'Course ID is required' });
+      }
+
+      if (!groups || !Array.isArray(groups) || groups.length === 0) {
+        return res.status(400).json({ message: 'No group data provided' });
+      }
+
+      const conn = await pool.getConnection();
+
+      try {
+        await conn.beginTransaction();
+
+        // Check course access
+        if (req.user.role === 'teacher') {
+          const [courseAccess] = await conn.execute(
+            'SELECT 1 FROM course_teachers WHERE course_id = ? AND teacher_id = ?',
+            [courseId, req.user.id]
+          );
+
+          if (courseAccess.length === 0) {
+            await conn.rollback();
+            conn.release();
+            return res.status(403).json({ message: 'You do not have access to this course' });
+          }
+        }
+
+        const importedAssignments = [];
+        const errors = [];
+        const createdGroups = new Map(); // Track created groups by name
+
+        for (let i = 0; i < groups.length; i++) {
+          const group = groups[i];
+
+          try {
+            const groupName = group.groupName.trim();
+            const userId = group.userId.trim();
+
+            // Find the student by Q number
+            const [studentResult] = await conn.execute(
+              'SELECT id FROM users WHERE LOWER(q_number) = ? AND role = "student"',
+              [userId.toLowerCase()]
+            );
+
+            if (studentResult.length === 0) {
+              errors.push(`Student with Q Number ${userId} not found`);
+              continue;
+            }
+
+            const studentId = studentResult[0].id;
+
+            // Check if student is enrolled in course
+            const [enrollmentCheck] = await conn.execute(
+              'SELECT 1 FROM course_students WHERE course_id = ? AND student_id = ?',
+              [courseId, studentId]
+            );
+
+            if (enrollmentCheck.length === 0) {
+              errors.push(`Student ${userId} is not enrolled in the course`);
+              continue;
+            }
+
+            let groupId;
+
+            // Check if group already exists or was created in this import
+            if (createdGroups.has(groupName)) {
+              groupId = createdGroups.get(groupName);
+            } else {
+              // Check if group exists in database
+              const [existingGroup] = await conn.execute(
+                'SELECT id FROM `groups` WHERE name = ? AND course_id = ?',
+                [groupName, courseId]
+              );
+
+              if (existingGroup.length > 0) {
+                groupId = existingGroup[0].id;
+                createdGroups.set(groupName, groupId);
+              } else {
+                // Create new group
+                const [groupResult] = await conn.execute(
+                  'INSERT INTO `groups` (name, course_id) VALUES (?, ?)',
+                  [groupName, courseId]
+                );
+                groupId = groupResult.insertId;
+                createdGroups.set(groupName, groupId);
+              }
+            }
+
+            // Check if student is already in this group
+            const [membershipCheck] = await conn.execute(
+              'SELECT 1 FROM group_students WHERE group_id = ? AND student_id = ?',
+              [groupId, studentId]
+            );
+
+            if (membershipCheck.length > 0) {
+              errors.push(`Student ${userId} is already in group "${groupName}"`);
+              continue;
+            }
+
+            // Add student to group
+            await conn.execute(
+              'INSERT INTO group_students (group_id, student_id) VALUES (?, ?)',
+              [groupId, studentId]
+            );
+
+            importedAssignments.push({
+              groupName,
+              userId,
+              firstName: group.firstName.trim(),
+              lastName: group.lastName.trim()
+            });
+
+          } catch (insertError) {
+            console.error('Error processing group assignment:', insertError);
+            errors.push(`Failed to assign student ${group.userId} to group "${group.groupName}": ${insertError.message}`);
+          }
+        }
+
+        if (errors.length > 0 && importedAssignments.length === 0) {
+          await conn.rollback();
+          return res.status(400).json({
+            message: 'Failed to import any group assignments',
+            errors
+          });
+        }
+
+        await conn.commit();
+
+        res.json({
+          message: `Successfully imported ${importedAssignments.length} group assignments`,
+          imported: importedAssignments,
+          errors: errors.length > 0 ? errors : undefined,
+          totalImported: importedAssignments.length,
+          totalErrors: errors.length,
+          groupsCreated: createdGroups.size
+        });
+
+      } catch (error) {
+        await conn.rollback();
+        throw error;
+      } finally {
+        conn.release();
+      }
+
+    } catch (error) {
+      console.error('Error importing groups:', error);
+      res.status(500).json({ message: 'Server error during import: ' + error.message });
+    }
+  });
+
+  // Download group template
+  router.get('/template/groups', authenticateToken, requireTeacherOrAdmin, (req, res) => {
+    // Create a simple XLSX template
+    const XLSX = require('xlsx');
+
+    const templateData = [
+      ['group set name', 'group name', 'user id', 'first name', 'last name'],
+      ['', 'Group 1', 'q1703022', 'Alice', 'Johnson'],
+      ['', 'Group 1', 'q1703023', 'Bob', 'Smith'],
+      ['', 'Group 2', 'q1703024', 'Charlie', 'Brown'],
+      ['', 'Group 2', 'q1703025', 'Diana', 'Wilson']
+    ];
+
+    const worksheet = XLSX.utils.aoa_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Groups');
+
+    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="group_import_template.xlsx"');
+    res.send(buffer);
   });
 
   return router;

@@ -3,11 +3,28 @@
         <div class="import-container">
             <h1>Import Data</h1>
 
+            <!-- Import Type Selection -->
+            <div v-if="currentStep === 1 && !selectedImportType" class="import-type-selection">
+                <h2>What would you like to import?</h2>
+                <div class="import-type-cards">
+                    <div class="import-type-card" @click="selectImportType('students')">
+                        <i class="fas fa-user-graduate"></i>
+                        <h3>Import Students</h3>
+                        <p>Import student information into the system</p>
+                    </div>
+                    <div class="import-type-card" @click="selectImportType('groups')">
+                        <i class="fas fa-users"></i>
+                        <h3>Import Groups</h3>
+                        <p>Import groups and assign students to them</p>
+                    </div>
+                </div>
+            </div>
+
             <!-- Step indicator -->
-            <div class="step-indicator">
+            <div v-if="selectedImportType" class="step-indicator">
                 <div class="step" :class="{ active: currentStep === 1, completed: currentStep > 1 }">
                     <span class="step-number">1</span>
-                    <span class="step-label">Upload File</span>
+                    <span class="step-label">{{ importType === 'groups' ? 'Select Course & Upload' : 'Upload File' }}</span>
                 </div>
                 <div class="step-divider"></div>
                 <div class="step" :class="{ active: currentStep === 2, completed: currentStep > 2 }">
@@ -22,11 +39,32 @@
             </div>
 
             <!-- Step 1: File Upload -->
-            <div v-if="currentStep === 1" class="step-content">
+            <div v-if="currentStep === 1 && selectedImportType" class="step-content">
+                <!-- Course Selection for Groups -->
+                <div v-if="importType === 'groups'" class="course-selection-card">
+                    <div class="card-header">
+                        <i class="fas fa-university"></i>
+                        <h2>Select Course</h2>
+                    </div>
+                    <div class="course-selection">
+                        <label for="course-select">Choose a course for group import:</label>
+                        <select id="course-select" v-model="selectedCourseId" class="course-select">
+                            <option value="">-- Select a Course --</option>
+                            <option v-for="course in availableCourses" :key="course.id" :value="course.id">
+                                {{ course.name }} ({{ course.code }})
+                            </option>
+                        </select>
+                    </div>
+                </div>
+
                 <div class="import-card">
                     <div class="card-header">
-                        <i class="fas fa-user-graduate"></i>
-                        <h2>Import Students</h2>
+                        <i :class="importType === 'students' ? 'fas fa-user-graduate' : 'fas fa-users'"></i>
+                        <h2>{{ importType === 'students' ? 'Import Students' : 'Import Groups' }}</h2>
+                        <button class="btn-back" @click="resetImportType">
+                            <i class="fas fa-arrow-left"></i>
+                            Change Type
+                        </button>
                     </div>
 
                     <!-- Introduction section -->
@@ -35,7 +73,8 @@
                             <i class="fas fa-info-circle intro-icon"></i>
                             <div class="intro-text">
                                 <h3>How it works</h3>
-                                <p>Upload a CSV file containing student information. We'll validate the data and let you review it before importing.</p>
+                                <p v-if="importType === 'students'">Upload a CSV file containing student information. We'll validate the data and let you review it before importing.</p>
+                                <p v-else>Upload an XLSX file containing group information and student assignments. We'll validate the data and let you review it before importing.</p>
                             </div>
                         </div>
                     </div>
@@ -43,7 +82,8 @@
                     <!-- Template download -->
                     <div class="template-section">
                         <h3>Need a template?</h3>
-                        <p>Download our CSV template to get started with the correct format. You can also open it in Excel and save as XLSX.</p>
+                        <p v-if="importType === 'students'">Download our CSV template to get started with the correct format. You can also open it in Excel and save as XLSX.</p>
+                        <p v-else>Download our XLSX template to get started with the correct format for group imports.</p>
                         <button class="template-button" @click="downloadTemplate" :disabled="downloading">
                             <i class="fas fa-download"></i>
                             {{ downloading ? 'Downloading...' : 'Download Template' }}
@@ -51,14 +91,15 @@
                     </div>
 
                     <!-- File upload area -->
-                    <div class="upload-zone"
+                    <div v-if="importType === 'students' || (importType === 'groups' && selectedCourseId)"
+                         class="upload-zone"
                          @dragover.prevent="isDragging = true"
                          @dragleave.prevent="isDragging = false"
                          @drop.prevent="handleFileDrop"
                          :class="{ 'dragging': isDragging, 'has-file': selectedFile }">
 
                         <input type="file"
-                               accept=".csv,.xlsx"
+                               :accept="importType === 'students' ? '.csv,.xlsx' : '.xlsx'"
                                @change="handleFileSelect"
                                ref="fileInput"
                                class="file-input"
@@ -66,14 +107,18 @@
 
                         <div v-if="!selectedFile">
                             <i class="fas fa-file-upload upload-icon"></i>
-                            <h3>Drag & Drop your CSV or Excel file here</h3>
+                            <h3 v-if="importType === 'students'">Drag & Drop your CSV or Excel file here</h3>
+                            <h3 v-else>Drag & Drop your Excel file here</h3>
                             <p>or</p>
                             <label for="csv-file-input" class="browse-button">
                                 <i class="fas fa-folder-open"></i>
                                 Browse Files
                             </label>
-                            <p class="file-requirements">
+                            <p class="file-requirements" v-if="importType === 'students'">
                                 Supported formats: CSV and XLSX files • Max size: 5MB
+                            </p>
+                            <p class="file-requirements" v-else>
+                                Supported formats: XLSX files • Max size: 5MB
                             </p>
                         </div>
 
@@ -136,7 +181,7 @@
 
                     <!-- Data table -->
                     <div class="data-table-container">
-                        <table class="data-table">
+                        <table class="data-table" v-if="importType === 'students'">
                             <thead>
                                 <tr>
                                     <th>Row</th>
@@ -210,6 +255,81 @@
                                 </tr>
                             </tbody>
                         </table>
+
+                        <table class="data-table" v-else-if="importType === 'groups'">
+                            <thead>
+                                <tr>
+                                    <th>Row</th>
+                                    <th>Group Name</th>
+                                    <th>User ID</th>
+                                    <th>First Name</th>
+                                    <th>Last Name</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="(row, index) in editableData"
+                                    :key="index"
+                                    :class="{ 'invalid-row': !row.isValid, 'editing-row': row.editing }">
+                                    <td>{{ row.row }}</td>
+                                    <td>
+                                        <input v-if="row.editing"
+                                               v-model="row.groupName"
+                                               type="text"
+                                               class="edit-input"
+                                               @blur="validateRow(row)">
+                                        <span v-else>{{ row.groupName }}</span>
+                                    </td>
+                                    <td>
+                                        <input v-if="row.editing"
+                                               v-model="row.userId"
+                                               type="text"
+                                               class="edit-input"
+                                               @blur="validateRow(row)">
+                                        <span v-else>{{ row.userId }}</span>
+                                    </td>
+                                    <td>
+                                        <input v-if="row.editing"
+                                               v-model="row.firstName"
+                                               type="text"
+                                               class="edit-input"
+                                               @blur="validateRow(row)">
+                                        <span v-else>{{ row.firstName }}</span>
+                                    </td>
+                                    <td>
+                                        <input v-if="row.editing"
+                                               v-model="row.lastName"
+                                               type="text"
+                                               class="edit-input"
+                                               @blur="validateRow(row)">
+                                        <span v-else>{{ row.lastName }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="status-badge" :class="row.isValid ? 'valid' : 'invalid'">
+                                            <i :class="row.isValid ? 'fas fa-check' : 'fas fa-times'"></i>
+                                            {{ row.isValid ? 'Valid' : 'Invalid' }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <button v-if="!row.editing"
+                                                class="btn-edit"
+                                                @click="startEditing(row)"
+                                                :disabled="importing">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <div v-else class="edit-actions">
+                                            <button class="btn-save" @click="stopEditing(row)">
+                                                <i class="fas fa-check"></i>
+                                            </button>
+                                            <button class="btn-cancel" @click="cancelEdit(row)">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
 
                     <!-- Action buttons -->
@@ -222,7 +342,7 @@
                                 @click="proceedWithImport"
                                 :disabled="!canProceedWithImport || importing">
                             <i class="fas fa-upload"></i>
-                            {{ importing ? 'Importing...' : `Import ${validRowsCount} Students` }}
+                            {{ importing ? 'Importing...' : `Import ${validRowsCount} ${importType === 'students' ? 'Students' : 'Groups'}` }}
                         </button>
                     </div>
                 </div>
@@ -238,7 +358,8 @@
                     <div v-if="importResults?.totalImported > 0" class="success-message">
                         <i class="fas fa-check-circle"></i>
                         <h3>Import Completed Successfully!</h3>
-                        <p>{{ importResults.totalImported }} students have been imported.</p>
+                        <p v-if="importType === 'students'">{{ importResults.totalImported }} students have been imported.</p>
+                        <p v-else>{{ importResults.totalImported }} group assignments have been imported.</p>
                     </div>
 
                     <div v-if="importResults?.errors?.length > 0" class="import-errors">
@@ -269,11 +390,11 @@
                     <div class="action-buttons">
                         <button class="btn-primary" @click="startOver">
                             <i class="fas fa-plus"></i>
-                            Import More Students
+                            {{ importType === 'students' ? 'Import More Students' : 'Import More Groups' }}
                         </button>
-                        <button class="btn-secondary" @click="$router.push('/students')">
-                            <i class="fas fa-users"></i>
-                            View Students
+                        <button class="btn-secondary" @click="navigateToView">
+                            <i :class="importType === 'students' ? 'fas fa-users' : 'fas fa-layer-group'"></i>
+                            {{ importType === 'students' ? 'View Students' : 'View Groups' }}
                         </button>
                     </div>
                 </div>
@@ -307,7 +428,11 @@ export default {
             previewResponse: null,
             editableData: [],
             originalData: [],
-            importResults: null
+            importResults: null,
+            selectedImportType: false,
+            importType: '',
+            selectedCourseId: '',
+            availableCourses: []
         };
     },
     computed: {
@@ -318,7 +443,45 @@ export default {
             return this.validRowsCount > 0;
         }
     },
+    async mounted() {
+        // Load available courses for group import
+        await this.loadCourses();
+    },
     methods: {
+        // Import type selection
+        selectImportType(type) {
+            this.importType = type;
+            this.selectedImportType = true;
+        },
+
+        resetImportType() {
+            this.selectedImportType = false;
+            this.importType = '';
+            this.currentStep = 1;
+            this.selectedFile = null;
+            this.selectedCourseId = '';
+            this.previewResponse = null;
+            this.editableData = [];
+            this.originalData = [];
+            this.importResults = null;
+            if (this.$refs.fileInput) {
+                this.$refs.fileInput.value = '';
+            }
+        },
+
+        // Load courses for group import
+        async loadCourses() {
+            try {
+                const response = await api.courses.getCourses(true); // Only courses user teaches
+                this.availableCourses = response.data;
+            } catch (error) {
+                console.error('Error loading courses:', error);
+                this.notificationStore.addNotification({
+                    type: 'error',
+                    message: 'Failed to load courses'
+                });
+            }
+        },
         // File handling methods
         handleFileDrop(event) {
             this.isDragging = false;
@@ -338,12 +501,22 @@ export default {
         processFile(file) {
             // Validate file type
             const fileName = file.name.toLowerCase();
-            if (!fileName.endsWith('.csv') && !fileName.endsWith('.xlsx')) {
-                this.notificationStore.addNotification({
-                    type: 'error',
-                    message: 'Please select a CSV or XLSX file'
-                });
-                return;
+            if (this.importType === 'students') {
+                if (!fileName.endsWith('.csv') && !fileName.endsWith('.xlsx')) {
+                    this.notificationStore.addNotification({
+                        type: 'error',
+                        message: 'Please select a CSV or XLSX file'
+                    });
+                    return;
+                }
+            } else if (this.importType === 'groups') {
+                if (!fileName.endsWith('.xlsx')) {
+                    this.notificationStore.addNotification({
+                        type: 'error',
+                        message: 'Please select an XLSX file for group import'
+                    });
+                    return;
+                }
             }
 
             // Validate file size (5MB limit)
@@ -387,14 +560,22 @@ export default {
         async downloadTemplate() {
             try {
                 this.downloading = true;
-                const response = await api.import.getStudentTemplate();
+                let response;
+
+                if (this.importType === 'students') {
+                    response = await api.import.getStudentTemplate();
+                } else {
+                    response = await api.import.getGroupTemplate();
+                }
 
                 // Create blob and download
-                const blob = new Blob([response.data], { type: 'text/csv' });
+                const blob = new Blob([response.data], {
+                    type: this.importType === 'students' ? 'text/csv' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                });
                 const url = window.URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
-                link.download = 'student_import_template.csv';
+                link.download = this.importType === 'students' ? 'student_import_template.csv' : 'group_import_template.xlsx';
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
@@ -419,16 +600,34 @@ export default {
         async handlePreviewData() {
             if (!this.selectedFile) return;
 
+            if (this.importType === 'groups' && !this.selectedCourseId) {
+                this.notificationStore.addNotification({
+                    type: 'error',
+                    message: 'Please select a course before uploading the file'
+                });
+                return;
+            }
+
             console.log('Starting preview process...');
             console.log('Selected file:', this.selectedFile);
+            console.log('Import type:', this.importType);
 
             try {
                 this.processing = true;
                 const formData = new FormData();
                 formData.append('file', this.selectedFile);
 
+                if (this.importType === 'groups') {
+                    formData.append('courseId', this.selectedCourseId);
+                }
+
                 console.log('Calling API preview...');
-                const response = await api.import.previewStudents(formData);
+                let response;
+                if (this.importType === 'students') {
+                    response = await api.import.previewStudents(formData);
+                } else {
+                    response = await api.import.previewGroups(formData);
+                }
                 console.log('API Response:', response.data);
 
                 this.previewResponse = response.data;
@@ -463,12 +662,21 @@ export default {
         // Row editing methods
         startEditing(row) {
             row.editing = true;
-            row.originalValues = {
-                email: row.email,
-                firstName: row.firstName,
-                lastName: row.lastName,
-                qNumber: row.qNumber
-            };
+            if (this.importType === 'students') {
+                row.originalValues = {
+                    email: row.email,
+                    firstName: row.firstName,
+                    lastName: row.lastName,
+                    qNumber: row.qNumber
+                };
+            } else {
+                row.originalValues = {
+                    groupName: row.groupName,
+                    userId: row.userId,
+                    firstName: row.firstName,
+                    lastName: row.lastName
+                };
+            }
         },
 
         stopEditing(row) {
@@ -479,10 +687,17 @@ export default {
 
         cancelEdit(row) {
             if (row.originalValues) {
-                row.email = row.originalValues.email;
-                row.firstName = row.originalValues.firstName;
-                row.lastName = row.originalValues.lastName;
-                row.qNumber = row.originalValues.qNumber;
+                if (this.importType === 'students') {
+                    row.email = row.originalValues.email;
+                    row.firstName = row.originalValues.firstName;
+                    row.lastName = row.originalValues.lastName;
+                    row.qNumber = row.originalValues.qNumber;
+                } else {
+                    row.groupName = row.originalValues.groupName;
+                    row.userId = row.originalValues.userId;
+                    row.firstName = row.originalValues.firstName;
+                    row.lastName = row.originalValues.lastName;
+                }
             }
             row.editing = false;
             delete row.originalValues;
@@ -490,29 +705,52 @@ export default {
 
         validateRow(row) {
             // Basic validation
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            const qNumberRegex = /^q\d+$/i;
-
             const errors = [];
 
-            if (!row.email?.trim()) {
-                errors.push('Email is required');
-            } else if (!emailRegex.test(row.email.trim())) {
-                errors.push('Invalid email format');
-            }
+            if (this.importType === 'students') {
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                const qNumberRegex = /^q\d+$/i;
 
-            if (!row.firstName?.trim()) {
-                errors.push('First name is required');
-            }
+                if (!row.email?.trim()) {
+                    errors.push('Email is required');
+                } else if (!emailRegex.test(row.email.trim())) {
+                    errors.push('Invalid email format');
+                }
 
-            if (!row.lastName?.trim()) {
-                errors.push('Last name is required');
-            }
+                if (!row.firstName?.trim()) {
+                    errors.push('First name is required');
+                }
 
-            if (!row.qNumber?.trim()) {
-                errors.push('Q Number is required');
-            } else if (!qNumberRegex.test(row.qNumber.trim())) {
-                errors.push('Q Number must start with "q" followed by numbers');
+                if (!row.lastName?.trim()) {
+                    errors.push('Last name is required');
+                }
+
+                if (!row.qNumber?.trim()) {
+                    errors.push('Q Number is required');
+                } else if (!qNumberRegex.test(row.qNumber.trim())) {
+                    errors.push('Q Number must start with "q" followed by numbers');
+                }
+            } else {
+                // Groups validation
+                const qNumberRegex = /^q\d+$/i;
+
+                if (!row.groupName?.trim()) {
+                    errors.push('Group name is required');
+                }
+
+                if (!row.userId?.trim()) {
+                    errors.push('User ID is required');
+                } else if (!qNumberRegex.test(row.userId.trim())) {
+                    errors.push('User ID must start with "q" followed by numbers');
+                }
+
+                if (!row.firstName?.trim()) {
+                    errors.push('First name is required');
+                }
+
+                if (!row.lastName?.trim()) {
+                    errors.push('Last name is required');
+                }
             }
 
             row.isValid = errors.length === 0;
@@ -526,39 +764,57 @@ export default {
             try {
                 this.importing = true;
 
-                // Prepare valid students for import
-                const validStudents = this.editableData
-                    .filter(row => row.isValid)
-                    .map(row => ({
-                        email: row.email?.trim(),
-                        firstName: row.firstName?.trim(),
-                        lastName: row.lastName?.trim(),
-                        qNumber: row.qNumber?.trim()
-                    }));
+                if (this.importType === 'students') {
+                    // Prepare valid students for import
+                    const validStudents = this.editableData
+                        .filter(row => row.isValid)
+                        .map(row => ({
+                            email: row.email?.trim(),
+                            firstName: row.firstName?.trim(),
+                            lastName: row.lastName?.trim(),
+                            qNumber: row.qNumber?.trim()
+                        }));
 
-                const response = await api.import.importStudents(validStudents);
-                this.importResults = response.data;
+                    const response = await api.import.importStudents(validStudents);
+                    this.importResults = response.data;
+                } else {
+                    // Prepare valid groups for import
+                    const validGroups = this.editableData
+                        .filter(row => row.isValid)
+                        .map(row => ({
+                            groupName: row.groupName?.trim(),
+                            userId: row.userId?.trim(),
+                            firstName: row.firstName?.trim(),
+                            lastName: row.lastName?.trim()
+                        }));
+
+                    const response = await api.import.importGroups({
+                        courseId: this.selectedCourseId,
+                        groups: validGroups
+                    });
+                    this.importResults = response.data;
+                }
 
                 this.currentStep = 3;
 
                 if (this.importResults.totalImported > 0) {
                     this.notificationStore.addNotification({
                         type: 'success',
-                        message: `Successfully imported ${this.importResults.totalImported} students`
+                        message: `Successfully imported ${this.importResults.totalImported} ${this.importType === 'students' ? 'students' : 'group assignments'}`
                     });
                 }
 
                 if (this.importResults.errors?.length > 0) {
                     this.notificationStore.addNotification({
                         type: 'warning',
-                        message: `${this.importResults.errors.length} students failed to import`
+                        message: `${this.importResults.errors.length} ${this.importType === 'students' ? 'students' : 'group assignments'} failed to import`
                     });
                 }
             } catch (error) {
                 console.error('Import error:', error);
                 this.notificationStore.addNotification({
                     type: 'error',
-                    message: error.response?.data?.message || 'Failed to import students'
+                    message: error.response?.data?.message || `Failed to import ${this.importType}`
                 });
             } finally {
                 this.importing = false;
@@ -576,11 +832,22 @@ export default {
         startOver() {
             this.currentStep = 1;
             this.selectedFile = null;
+            this.selectedCourseId = '';
             this.previewResponse = null;
             this.editableData = [];
             this.originalData = [];
             this.importResults = null;
-            this.$refs.fileInput.value = '';
+            if (this.$refs.fileInput) {
+                this.$refs.fileInput.value = '';
+            }
+        },
+
+        navigateToView() {
+            if (this.importType === 'students') {
+                this.$router.push('/students');
+            } else {
+                this.$router.push('/groups');
+            }
         }
     }
 };
@@ -599,6 +866,118 @@ export default {
     margin-bottom: 2rem;
     font-size: 2.5rem;
     font-weight: 300;
+}
+
+/* Import Type Selection */
+.import-type-selection {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.import-type-selection h2 {
+    color: #2c3e50;
+    margin-bottom: 2rem;
+    font-size: 1.8rem;
+    font-weight: 300;
+}
+
+.import-type-cards {
+    display: flex;
+    gap: 2rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.import-type-card {
+    background: white;
+    border: 2px solid #ecf0f1;
+    border-radius: 12px;
+    padding: 2rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    min-width: 250px;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.import-type-card:hover {
+    border-color: #3498db;
+    transform: translateY(-4px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+}
+
+.import-type-card i {
+    font-size: 3rem;
+    color: #3498db;
+    margin-bottom: 1rem;
+}
+
+.import-type-card h3 {
+    color: #2c3e50;
+    margin: 0 0 0.5rem 0;
+    font-size: 1.3rem;
+}
+
+.import-type-card p {
+    color: #7f8c8d;
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+/* Course Selection */
+.course-selection-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.course-selection {
+    margin-top: 1rem;
+}
+
+.course-selection label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #2c3e50;
+    font-weight: 500;
+}
+
+.course-select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #ecf0f1;
+    border-radius: 8px;
+    font-size: 1rem;
+    color: #2c3e50;
+    background: white;
+    transition: border-color 0.3s ease;
+}
+
+.course-select:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.btn-back {
+    background: #95a5a6;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-back:hover {
+    background: #7f8c8d;
+    transform: translateY(-1px);
 }
 
 /* Step Indicator */

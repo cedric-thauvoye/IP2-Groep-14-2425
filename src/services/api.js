@@ -108,9 +108,10 @@ export const importService = {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
   importStudents: (studentsData) => apiClient.post('/import/students', { students: studentsData }),
-  importGroups: (formData) => apiClient.post('/import/groups', formData, {
+  previewGroups: (formData) => apiClient.post('/import/groups/preview', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
+  importGroups: (groupsData) => apiClient.post('/import/groups', groupsData),
   getStudentTemplate: () => apiClient.get('/import/template/students', {
     responseType: 'blob'
   }),
