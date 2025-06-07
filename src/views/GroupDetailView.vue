@@ -142,7 +142,7 @@
       <div v-if="showAddStudentModal" class="modal-overlay">
         <div class="modal-content">
           <div class="modal-header">
-            <h2>Add Student to Group</h2>
+            <h2>Add Students to Group</h2>
             <button class="close-button" @click="showAddStudentModal = false">
               <i class="fas fa-times"></i>
             </button>
@@ -156,41 +156,63 @@
               <p>No available students to add to this group.</p>
             </div>
             <div v-else>
-              <div class="search-box">
-                <i class="fas fa-search"></i>
-                <input
-                  type="text"
-                  v-model="studentSearchQuery"
-                  placeholder="Search students..."
-                  @input="filterStudents"
-                >
+              <!-- Selected Students Section -->
+              <div v-if="selectedStudentIds.length > 0" class="selected-students-section">
+                <label>Selected Students ({{ selectedStudentIds.length }})</label>
+                <div class="selected-students">
+                  <div v-for="selectedId in selectedStudentIds" :key="selectedId" class="selected-student-chip">
+                    {{ getSelectedStudentName(selectedId) }}
+                    <button type="button" @click="removeSelectedStudent(selectedId)" class="remove-chip">
+                      <i class="fas fa-times"></i>
+                    </button>
+                  </div>
+                </div>
               </div>
 
-              <div class="students-select-list">
-                <div
-                  v-for="student in filteredStudents"
-                  :key="student.id"
-                  class="student-select-item"
-                >
-                  <div class="student-info">
-                    <div class="student-avatar">
-                      {{ getInitials(student.first_name, student.last_name) }}
-                    </div>
-                    <div class="student-details">
-                      <h3>{{ student.first_name }} {{ student.last_name }}</h3>
-                      <p class="student-email">{{ student.email }}</p>
-                      <p class="student-id">{{ student.q_number }}</p>
+              <!-- Student Selector -->
+              <div class="student-selector">
+                <div class="search-box">
+                  <i class="fas fa-search"></i>
+                  <input
+                    type="text"
+                    v-model="studentSearchQuery"
+                    placeholder="Search students..."
+                    @input="filterStudents"
+                  >
+                </div>
+
+                <div class="students-select-list">
+                  <div
+                    v-for="student in filteredStudents"
+                    :key="student.id"
+                    class="student-select-item"
+                    @click="toggleStudentSelection(student.id)"
+                  >
+                    <div class="student-info">
+                      <div class="student-avatar">
+                        {{ getInitials(student.first_name, student.last_name) }}
+                      </div>
+                      <div class="student-details">
+                        <h3>{{ student.first_name }} {{ student.last_name }}</h3>
+                        <p class="student-email">{{ student.email }}</p>
+                        <p class="student-id">{{ student.q_number }}</p>
+                      </div>
                     </div>
                   </div>
-                  <button class="add-student-button" @click="addStudent(student.id)">
-                    <i class="fas fa-plus"></i> Add
-                  </button>
                 </div>
               </div>
             </div>
             <div class="form-actions">
-              <button type="button" class="cancel-button" @click="showAddStudentModal = false">
-                Close
+              <button type="button" class="cancel-button" @click="cancelAddStudents">
+                Cancel
+              </button>
+              <button
+                type="button"
+                class="save-button"
+                @click="addSelectedStudents"
+                :disabled="selectedStudentIds.length === 0"
+              >
+                Add {{ selectedStudentIds.length }} Student{{ selectedStudentIds.length !== 1 ? 's' : '' }}
               </button>
             </div>
           </div>
@@ -397,6 +419,7 @@ const loadingStudents = ref(false);
 const availableStudents = ref([]);
 const studentSearchQuery = ref('');
 const filteredStudents = ref([]);
+const selectedStudentIds = ref([]);
 const showCreateAssessmentModal = ref(false);
 const submittingAssessment = ref(false);
 const showDeleteModal = ref(false);
@@ -673,8 +696,71 @@ const checkUserRole = async () => {
 // Open add student modal (teachers only)
 const openAddStudentModal = async () => {
   if (isTeacher.value) {
+    selectedStudentIds.value = [];
+    studentSearchQuery.value = '';
     showAddStudentModal.value = true;
     await fetchAvailableStudents();
+  }
+};
+
+// Enhanced student selection methods
+const toggleStudentSelection = (studentId) => {
+  const index = selectedStudentIds.value.indexOf(studentId);
+  if (index === -1) {
+    selectedStudentIds.value.push(studentId);
+  } else {
+    selectedStudentIds.value.splice(index, 1);
+  }
+};
+
+const removeSelectedStudent = (studentId) => {
+  const index = selectedStudentIds.value.indexOf(studentId);
+  if (index !== -1) {
+    selectedStudentIds.value.splice(index, 1);
+  }
+};
+
+const getSelectedStudentName = (studentId) => {
+  const student = availableStudents.value.find(s => s.id === studentId);
+  return student ? `${student.first_name} ${student.last_name}` : '';
+};
+
+const cancelAddStudents = () => {
+  selectedStudentIds.value = [];
+  studentSearchQuery.value = '';
+  showAddStudentModal.value = false;
+};
+
+const addSelectedStudents = async () => {
+  if (selectedStudentIds.value.length === 0) return;
+
+  try {
+    // Add all selected students to the group
+    const promises = selectedStudentIds.value.map(studentId =>
+      groupService.addStudentToGroup(group.value.id, studentId)
+    );
+
+    await Promise.all(promises);
+
+    notificationStore.success(`${selectedStudentIds.value.length} student${selectedStudentIds.value.length !== 1 ? 's' : ''} added to group successfully.`);
+
+    // Reset selection and close modal
+    selectedStudentIds.value = [];
+    studentSearchQuery.value = '';
+    showAddStudentModal.value = false;
+
+    // Refresh both group data and available students list
+    const refreshPromises = [fetchGroupDetails()];
+    if (isTeacher.value) {
+      refreshPromises.push(fetchAvailableStudents());
+    }
+    await Promise.all(refreshPromises);
+
+    // Reset filtered students
+    filterStudents();
+  } catch (err) {
+    console.error('Error adding students:', err);
+    notificationStore.error('Failed to add students. Please try again.');
   }
 };
 
@@ -1136,6 +1222,94 @@ onMounted(async () => {
 @media (max-width: 992px) {
   .details-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Enhanced Student Selection Styles */
+.selected-students-section {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.selected-students-section label {
+  display: block;
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.selected-students {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.selected-student-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: #3498db;
+  color: white;
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  animation: fadeIn 0.2s ease-in;
+}
+
+.remove-chip {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  transition: background-color 0.2s;
+}
+
+.remove-chip:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.student-selector {
+  margin-top: 1rem;
+}
+
+.student-select-item {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 8px;
+}
+
+.student-select-item:hover {
+  background-color: #f8f9fa;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.students-select-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 

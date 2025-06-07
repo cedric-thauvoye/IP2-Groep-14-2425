@@ -7,7 +7,7 @@
           <p class="subtitle">{{ isTeacher ? 'Manage your courses' : 'Your enrolled courses' }}</p>
         </div>
         <div class="actions" v-if="isTeacher">
-          <button class="action-button create" @click="showCreateCourseModal = true">
+          <button class="action-button create" @click="openCreateCourseModal">
             <i class="fas fa-plus"></i> Create Course
           </button>
         </div>
@@ -110,8 +110,68 @@
                   placeholder="Describe the course content and objectives"
                 ></textarea>
               </div>
+
+              <!-- Students Section -->
+              <div class="form-group">
+                <label>Students (Optional)</label>
+                <p class="form-hint">You can add students now or later from the course details page.</p>
+
+                <!-- Selected Students Section -->
+                <div v-if="selectedStudentIds.length > 0" class="selected-students-section">
+                  <label>Selected Students ({{ selectedStudentIds.length }})</label>
+                  <div class="selected-students">
+                    <div v-for="selectedId in selectedStudentIds" :key="selectedId" class="selected-student-chip">
+                      {{ getSelectedStudentName(selectedId) }}
+                      <button type="button" @click="removeSelectedStudent(selectedId)" class="remove-chip">
+                        <i class="fas fa-times"></i>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Student Selector -->
+                <div class="student-selector">
+                  <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input
+                      type="text"
+                      v-model="studentSearchQuery"
+                      placeholder="Search students..."
+                      @input="filterStudents"
+                      @focus="loadStudentsIfNeeded"
+                    >
+                  </div>
+
+                  <div v-if="loadingStudents" class="loading-indicator">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <span>Loading students...</span>
+                  </div>
+
+                  <div v-else-if="filteredStudents.length > 0" class="students-select-list compact">
+                    <div
+                      v-for="student in filteredStudents.slice(0, 5)"
+                      :key="student.id"
+                      class="student-select-item"
+                      @click="toggleStudentSelection(student.id)"
+                    >
+                      <div class="student-info">
+                        <div class="student-avatar">
+                          {{ getInitials(student.first_name, student.last_name) }}
+                        </div>
+                        <div class="student-details">
+                          <h3>{{ student.first_name }} {{ student.last_name }}</h3>
+                          <p class="student-email">{{ student.email }}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div v-if="filteredStudents.length > 5" class="more-students">
+                      And {{ filteredStudents.length - 5 }} more...
+                    </div>
+                  </div>
+                </div>
+              </div>
               <div class="form-actions">
-                <button type="button" class="cancel-button" @click="showCreateCourseModal = false">
+                <button type="button" class="cancel-button" @click="cancelCreateCourse">
                   Cancel
                 </button>
                 <button
@@ -214,7 +274,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
-import { courseService, authService } from '../services/api';
+import { courseService, authService, userService } from '../services/api';
 
 const router = useRouter();
 const courses = ref([]);
@@ -233,6 +293,13 @@ const newCourse = ref({
   code: '',
   description: ''
 });
+
+// Student selection variables
+const availableStudents = ref([]);
+const selectedStudentIds = ref([]);
+const studentSearchQuery = ref('');
+const filteredStudents = ref([]);
+const loadingStudents = ref(false);
 
 const getRandomColor = () => {
   const colors = ['#3498db', '#2ecc71', '#e74c3c', '#f1c40f', '#9b59b6', '#1abc9c'];
@@ -276,29 +343,51 @@ const createNewCourse = async () => {
   try {
     isCreating.value = true;
     const response = await courseService.createCourse(newCourse.value);
+    const courseId = response.data.id;
+
+    // Add selected students to the course if any
+    if (selectedStudentIds.value.length > 0) {
+      try {
+        const addStudentPromises = selectedStudentIds.value.map(studentId =>
+          courseService.addStudentToCourse(courseId, studentId)
+        );
+        await Promise.all(addStudentPromises);
+      } catch (error) {
+        console.error('Error adding students to course:', error);
+        // Continue even if student addition fails
+      }
+    }
 
     courses.value.push({
       ...response.data,
       isActive: true,
-      student_count: 0,
+      student_count: selectedStudentIds.value.length,
       teacher_count: 1,
       group_count: 0
     });
 
-    newCourse.value = {
-      name: '',
-      code: '',
-      description: ''
-    };
+    // Reset form
+    resetCreateCourseForm();
     showCreateCourseModal.value = false;
 
-    router.push(`/course/${response.data.id}`);
+    router.push(`/course/${courseId}`);
   } catch (error) {
     console.error('Error creating course:', error);
     alert('Failed to create course. Please check if the course code is unique.');
   } finally {
     isCreating.value = false;
   }
+};
+
+const resetCreateCourseForm = () => {
+  newCourse.value = {
+    name: '',
+    code: '',
+    description: ''
+  };
+  selectedStudentIds.value = [];
+  studentSearchQuery.value = '';
+  filteredStudents.value = [];
 };
 
 const deleteCourse = (courseId) => {
@@ -317,6 +406,72 @@ const confirmDeleteCourse = async () => {
     console.error('Error deleting course:', error);
     alert('Failed to delete course.');
   }
+};
+
+// Student selection methods
+const getInitials = (firstName, lastName) => {
+  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+};
+
+const loadStudentsIfNeeded = async () => {
+  if (availableStudents.value.length === 0 && !loadingStudents.value) {
+    await fetchAvailableStudents();
+  }
+};
+
+const fetchAvailableStudents = async () => {
+  loadingStudents.value = true;
+  try {
+    const response = await userService.getAllStudents();
+    availableStudents.value = response.data || [];
+    filterStudents();
+  } catch (error) {
+    console.error('Error fetching students:', error);
+    availableStudents.value = [];
+  } finally {
+    loadingStudents.value = false;
+  }
+};
+
+const filterStudents = () => {
+  const query = studentSearchQuery.value.toLowerCase();
+  filteredStudents.value = availableStudents.value.filter(student => {
+    const fullName = `${student.first_name} ${student.last_name}`.toLowerCase();
+    const email = student.email.toLowerCase();
+    const qNumber = student.q_number?.toLowerCase() || '';
+    return fullName.includes(query) || email.includes(query) || qNumber.includes(query);
+  });
+};
+
+const toggleStudentSelection = (studentId) => {
+  const index = selectedStudentIds.value.indexOf(studentId);
+  if (index === -1) {
+    selectedStudentIds.value.push(studentId);
+  } else {
+    selectedStudentIds.value.splice(index, 1);
+  }
+};
+
+const removeSelectedStudent = (studentId) => {
+  const index = selectedStudentIds.value.indexOf(studentId);
+  if (index !== -1) {
+    selectedStudentIds.value.splice(index, 1);
+  }
+};
+
+const getSelectedStudentName = (studentId) => {
+  const student = availableStudents.value.find(s => s.id === studentId);
+  return student ? `${student.first_name} ${student.last_name}` : '';
+};
+
+const openCreateCourseModal = () => {
+  resetCreateCourseForm();
+  showCreateCourseModal.value = true;
+};
+
+const cancelCreateCourse = () => {
+  resetCreateCourseForm();
+  showCreateCourseModal.value = false;
 };
 
 onMounted(async () => {
@@ -697,6 +852,138 @@ onMounted(async () => {
 
   .filters {
     flex-direction: column;
+  }
+}
+
+/* Enhanced Student Selection Styles */
+.selected-students-section {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.selected-students-section label {
+  display: block;
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.selected-students {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.selected-student-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: #3498db;
+  color: white;
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  animation: fadeIn 0.2s ease-in;
+}
+
+.remove-chip {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  transition: background-color 0.2s;
+}
+
+.remove-chip:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.student-selector {
+  margin-top: 1rem;
+}
+
+.student-select-item {
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: 8px;
+  padding: 0.75rem;
+  border: 1px solid #e9ecef;
+  margin-bottom: 0.5rem;
+  background-color: white;
+}
+
+.student-select-item:hover {
+  background-color: #f8f9fa;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-color: #3498db;
+}
+
+.students-select-list.compact {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.students-select-list.compact .student-select-item {
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.students-select-list.compact .student-details h3 {
+  font-size: 0.9rem;
+  margin-bottom: 0.25rem;
+}
+
+.students-select-list.compact .student-details p {
+  font-size: 0.8rem;
+  margin-bottom: 0;
+}
+
+.form-hint {
+  font-size: 0.85rem;
+  color: #6c757d;
+  margin-bottom: 1rem;
+  font-style: italic;
+}
+
+.more-students {
+  text-align: center;
+  padding: 0.5rem;
+  color: #6c757d;
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.loading-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  color: #6c757d;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 </style>
