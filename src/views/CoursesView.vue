@@ -18,13 +18,6 @@
           <i class="fas fa-search"></i>
           <input type="text" v-model="searchQuery" placeholder="Search courses...">
         </div>
-        <div class="filter-options">
-          <select v-model="semesterFilter">
-            <option value="">All Semesters</option>
-            <option value="1">Semester 1</option>
-            <option value="2">Semester 2</option>
-          </select>
-        </div>
       </div>
 
       <div v-if="loading" class="loading-state">
@@ -227,7 +220,6 @@ const router = useRouter();
 const courses = ref([]);
 const loading = ref(true);
 const searchQuery = ref('');
-const semesterFilter = ref('');
 const isTeacher = ref(false);
 const showCreateCourseModal = ref(false);
 const showEditCourseModal = ref(false);
@@ -251,8 +243,7 @@ const filteredCourses = computed(() => {
   return courses.value
     .filter(course => {
       const matchesSearch = course.name.toLowerCase().includes(searchQuery.value.toLowerCase());
-      const matchesSemester = !semesterFilter.value || course.semester === semesterFilter.value;
-      return matchesSearch && matchesSemester;
+      return matchesSearch;
     });
 });
 
