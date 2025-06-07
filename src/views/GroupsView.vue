@@ -128,6 +128,7 @@
                 <select
                   id="new-group-course"
                   v-model="newGroup.courseId"
+                  @change="watchCourseSelection"
                   required
                 >
                   <option value="" disabled>Select a course</option>
@@ -135,6 +136,54 @@
                     {{ course.name }}
                   </option>
                 </select>
+              </div>
+              <div class="form-group">
+                <label>Add Students (optional)</label>
+                <div v-if="availableStudents.length > 0" class="student-selector">
+                  <div class="selected-students">
+                    <div v-for="selectedId in newGroup.studentIds" :key="selectedId" class="selected-student-chip">
+                      {{ getStudentName(selectedId) }}
+                      <button type="button" @click="removeStudentFromNewGroup(selectedId)" class="remove-chip">
+                        <i class="fas fa-times"></i>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="student-dropdown">
+                    <div class="search-box">
+                      <i class="fas fa-search"></i>
+                      <input
+                        type="text"
+                        placeholder="Search students..."
+                        v-model="studentSearch"
+                      >
+                    </div>
+                    <div class="dropdown-options">
+                      <div
+                        v-for="student in filteredAvailableStudents"
+                        :key="student.id"
+                        class="student-select-item"
+                        @click="addStudentToNewGroup(student.id)"
+                      >
+                        <div class="student-info">
+                          <div class="student-avatar">
+                            {{ getStudentInitials(student.first_name, student.last_name) }}
+                          </div>
+                          <div class="student-details">
+                            <h3>{{ student.first_name }} {{ student.last_name }}</h3>
+                            <p class="student-email">{{ student.email }}</p>
+                            <p class="student-id">{{ student.q_number }}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div v-else-if="newGroup.courseId" class="no-students">
+                  <p>No available students for the selected course.</p>
+                </div>
+                <div v-else class="no-course-selected">
+                  <p>Select a course to see available students.</p>
+                </div>
               </div>
               <div class="form-actions">
                 <button type="button" class="cancel-button" @click="showCreateGroupModal = false">
@@ -185,7 +234,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
-import { groupService, authService, courseService } from '../services/api';
+import { groupService, authService, courseService, userService } from '../services/api';
 
 const router = useRouter();
 const groups = ref([]);
@@ -199,10 +248,13 @@ const searchQuery = ref('');
 const courseFilter = ref('');
 const newGroup = ref({
   name: '',
-  courseId: ''
+  courseId: '',
+  studentIds: []
 });
 const showDeleteModal = ref(false);
 const groupToDelete = ref(null);
+const availableStudents = ref([]);
+const studentSearch = ref('');
 
 // New computed property to filter groups based on search and course filter
 const filteredGroups = computed(() => {
@@ -217,6 +269,26 @@ const filteredGroups = computed(() => {
       group.course_id === parseInt(courseFilter.value);
 
     return matchesSearch && matchesCourse;
+  });
+});
+
+// Computed property to filter available students based on search
+const filteredAvailableStudents = computed(() => {
+  if (!studentSearch.value) {
+    return availableStudents.value.filter(student =>
+      !newGroup.value.studentIds.includes(student.id)
+    );
+  }
+
+  const searchTerm = studentSearch.value.toLowerCase();
+  return availableStudents.value.filter(student => {
+    const matchesSearch =
+      student.first_name.toLowerCase().includes(searchTerm) ||
+      student.last_name.toLowerCase().includes(searchTerm) ||
+      student.email.toLowerCase().includes(searchTerm) ||
+      (student.q_number && student.q_number.toLowerCase().includes(searchTerm));
+
+    return matchesSearch && !newGroup.value.studentIds.includes(student.id);
   });
 });
 
@@ -265,7 +337,15 @@ const confirmDeleteGroup = async () => {
 
 const createNewGroup = async () => {
   try {
-    await groupService.createGroup(newGroup.value);
+    // Create group with selected students
+    const groupData = {
+      name: newGroup.value.name,
+      courseId: newGroup.value.courseId,
+      studentIds: newGroup.value.studentIds
+    };
+
+    await groupService.createGroup(groupData);
+
     // Refresh the group list
     const response = await groupService.getGroups();
     groups.value = response.data;
@@ -274,11 +354,65 @@ const createNewGroup = async () => {
     showCreateGroupModal.value = false;
     newGroup.value = {
       name: '',
-      courseId: ''
+      courseId: '',
+      studentIds: []
     };
+    availableStudents.value = [];
+    studentSearch.value = '';
   } catch (error) {
     console.error('Error creating group:', error);
     alert('Failed to create group. Please try again.');
+  }
+};
+
+// Student management methods
+const getStudentName = (studentId) => {
+  const student = availableStudents.value.find(s => s.id === studentId);
+  return student ? `${student.first_name} ${student.last_name}` : 'Unknown Student';
+};
+
+const getStudentInitials = (firstName, lastName) => {
+  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+};
+
+const addStudentToNewGroup = (studentId) => {
+  if (!newGroup.value.studentIds.includes(studentId)) {
+    newGroup.value.studentIds.push(studentId);
+  }
+};
+
+const removeStudentFromNewGroup = (studentId) => {
+  newGroup.value.studentIds = newGroup.value.studentIds.filter(id => id !== studentId);
+};
+
+// Watch for course selection changes to load available students
+const loadAvailableStudents = async () => {
+  if (!newGroup.value.courseId) {
+    availableStudents.value = [];
+    return;
+  }
+
+  try {
+    const response = await userService.getStudents();
+    // Filter students to only include those enrolled in the selected course
+    const courseResponse = await courseService.getCourseById(newGroup.value.courseId);
+    const courseStudents = courseResponse.data.students || [];
+
+    availableStudents.value = response.data.filter(student =>
+      courseStudents.some(cs => cs.id === student.id)
+    );
+  } catch (error) {
+    console.error('Error loading available students:', error);
+    availableStudents.value = [];
+  }
+};
+
+// Watch course selection
+const watchCourseSelection = () => {
+  if (newGroup.value.courseId) {
+    loadAvailableStudents();
+    // Reset selected students when course changes
+    newGroup.value.studentIds = [];
   }
 };
 
@@ -540,6 +674,143 @@ onMounted(async () => {
   border-radius: 6px;
   box-sizing: border-box; /* Add this to include padding in width calculation */
   max-width: 100%; /* Ensure inputs don't exceed their container */
+}
+
+/* Student selector styles */
+.student-selector {
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #f8f9fa;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.selected-students {
+  padding: 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  border-bottom: 1px solid #ddd;
+  background: white;
+}
+
+.selected-student-chip {
+  background: #3498db;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 16px;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.remove-chip {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+}
+
+.remove-chip:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.student-dropdown .search-box {
+  padding: 0.5rem;
+  border-bottom: 1px solid #ddd;
+  background: white;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.student-dropdown .search-box i {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #7f8c8d;
+  z-index: 1;
+}
+
+.student-dropdown .search-box input {
+  width: 100%;
+  padding: 0.5rem 0.5rem 0.5rem 2.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.dropdown-options {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.student-select-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-radius: 8px;
+  background: #f8f9fa;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  border-bottom: 1px solid #eee;
+}
+
+.student-select-item:hover {
+  background: #e3f2fd;
+}
+
+.student-select-item:last-child {
+  border-bottom: none;
+}
+
+.student-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.student-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #3498db;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+.student-details h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #2c3e50;
+}
+
+.student-email, .student-id {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.8rem;
+  color: #7f8c8d;
+}
+
+.no-students, .no-course-selected {
+  padding: 1rem;
+  text-align: center;
+  color: #7f8c8d;
+  font-style: italic;
 }
 
 .form-actions {
