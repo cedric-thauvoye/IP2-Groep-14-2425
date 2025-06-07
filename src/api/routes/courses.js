@@ -160,9 +160,12 @@ module.exports = (pool) => {
         [id]
       );
 
-      // Get groups for the course
+      // Get groups for the course with student count
       const [groups] = await conn.execute(
-        'SELECT * FROM groups WHERE course_id = ?',
+        `SELECT g.*,
+                (SELECT COUNT(*) FROM group_students gs WHERE gs.group_id = g.id) as student_count
+         FROM groups g
+         WHERE g.course_id = ?`,
         [id]
       );
 
