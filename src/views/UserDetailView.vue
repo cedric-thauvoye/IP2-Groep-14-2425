@@ -130,7 +130,11 @@
             <div v-for="group in user.groups" :key="group.id" class="group-item">
               <div class="group-info">
                 <h3>{{ group.name }}</h3>
-                <p class="course-name">{{ group.course_name }}</p>
+                <p class="course-name">
+                  <router-link :to="`/course/${group.course_id}`" class="course-link">
+                    {{ group.course_name }}
+                  </router-link>
+                </p>
               </div>
               <div class="group-actions">
                 <router-link :to="`/group/${group.id}`" class="view-button">
@@ -777,6 +781,18 @@ onMounted(async () => {
   color: #3498db;
   font-size: 0.9rem;
   margin: 0 0 1rem 0;
+}
+
+.course-link {
+  color: inherit;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.course-link:hover {
+  text-decoration: underline;
+  color: #2980b9;
 }
 
 .course-actions, .group-actions {

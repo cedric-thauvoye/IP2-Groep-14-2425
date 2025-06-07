@@ -181,7 +181,11 @@
                     <tbody>
                         <tr v-for="group in filteredGroups" :key="group.id">
                             <td>{{ group.name }}</td>
-                            <td>{{ group.course_name }}</td>
+                            <td>
+                                <router-link :to="`/course/${group.course_id}`" class="course-link">
+                                    {{ group.course_name }}
+                                </router-link>
+                            </td>
                             <td>{{ group.student_count || 0 }}</td>
                             <td>{{ group.assessment_count || 0 }}</td>
                             <td class="actions">
@@ -1410,5 +1414,18 @@ onMounted(() => {
         display: block;
         overflow-x: auto;
     }
+}
+
+/* Course link styles */
+.course-link {
+    color: #3498db;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.course-link:hover {
+    text-decoration: underline;
+    color: #2980b9;
 }
 </style>

@@ -24,7 +24,11 @@
           </div>
           <div class="title-section">
             <h1>{{ group.name }}</h1>
-            <p class="course-name">{{ group.course_name }}</p>
+            <p class="course-name">
+              <router-link :to="`/course/${group.course_id}`" class="course-link">
+                {{ group.course_name }}
+              </router-link>
+            </p>
           </div>
           <div class="action-buttons" v-if="isTeacher">
             <button class="edit-button" @click="editGroup">
@@ -836,6 +840,18 @@ onMounted(async () => {
   color: #3498db;
   font-size: 1rem;
   margin: 0.5rem 0 0 0;
+}
+
+.course-link {
+  color: inherit;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.course-link:hover {
+  text-decoration: underline;
+  color: #2980b9;
 }
 
 .action-buttons {

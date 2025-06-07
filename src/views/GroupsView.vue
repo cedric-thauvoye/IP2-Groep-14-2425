@@ -47,7 +47,11 @@
               <i class="fas fa-users"></i> {{ group.student_count || 0 }}
             </span>
           </div>
-          <p class="course-name">{{ group.course_name }}</p>
+          <p class="course-name">
+            <router-link :to="`/course/${group.course_id}`" class="course-link">
+              {{ group.course_name }}
+            </router-link>
+          </p>
           <div class="group-footer">
             <router-link :to="`/group/${group.id}`" class="view-button">
               View Details
@@ -583,6 +587,18 @@ onMounted(async () => {
   color: #3498db;
   font-size: 0.9rem;
   margin: 0 0 1rem 0;
+}
+
+.course-link {
+  color: inherit;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.course-link:hover {
+  text-decoration: underline;
+  color: #2980b9;
 }
 
 .group-footer {
