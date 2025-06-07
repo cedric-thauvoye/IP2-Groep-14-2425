@@ -48,9 +48,6 @@
             </span>
           </div>
           <p class="course-name">{{ group.course_name }}</p>
-          <div class="group-content">
-            <p class="description">{{ group.description || 'No description available' }}</p>
-          </div>
           <div class="group-footer">
             <router-link :to="`/group/${group.id}`" class="view-button">
               View Details
@@ -92,14 +89,6 @@
                   v-model="editingGroup.name"
                   required
                 >
-              </div>
-              <div class="form-group">
-                <label for="group-description">Description</label>
-                <textarea
-                  id="group-description"
-                  v-model="editingGroup.description"
-                  rows="3"
-                ></textarea>
               </div>
               <div class="form-actions">
                 <button type="button" class="cancel-button" @click="showEditGroupModal = false">
@@ -146,14 +135,6 @@
                     {{ course.name }}
                   </option>
                 </select>
-              </div>
-              <div class="form-group">
-                <label for="new-group-description">Description</label>
-                <textarea
-                  id="new-group-description"
-                  v-model="newGroup.description"
-                  rows="3"
-                ></textarea>
               </div>
               <div class="form-actions">
                 <button type="button" class="cancel-button" @click="showCreateGroupModal = false">
@@ -218,8 +199,7 @@ const searchQuery = ref('');
 const courseFilter = ref('');
 const newGroup = ref({
   name: '',
-  courseId: '',
-  description: ''
+  courseId: ''
 });
 const showDeleteModal = ref(false);
 const groupToDelete = ref(null);
@@ -294,8 +274,7 @@ const createNewGroup = async () => {
     showCreateGroupModal.value = false;
     newGroup.value = {
       name: '',
-      courseId: '',
-      description: ''
+      courseId: ''
     };
   } catch (error) {
     console.error('Error creating group:', error);
@@ -470,12 +449,6 @@ onMounted(async () => {
   color: #3498db;
   font-size: 0.9rem;
   margin: 0 0 1rem 0;
-}
-
-.description {
-  color: #7f8c8d;
-  margin: 0;
-  font-size: 0.9rem;
 }
 
 .group-footer {

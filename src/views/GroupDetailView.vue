@@ -125,14 +125,6 @@
                   required
                 >
               </div>
-              <div class="form-group">
-                <label for="group-description">Description</label>
-                <textarea
-                  id="group-description"
-                  v-model="editingGroup.description"
-                  rows="3"
-                ></textarea>
-              </div>
               <div class="form-actions">
                 <button type="button" class="cancel-button" @click="showEditGroupModal = false">
                   Cancel
