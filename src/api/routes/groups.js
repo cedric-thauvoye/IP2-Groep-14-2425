@@ -33,7 +33,8 @@ module.exports = (pool) => {
         if (courseId) {
           query = `
             SELECT g.*, c.name as course_name,
-                   (SELECT COUNT(*) FROM group_students gs WHERE gs.group_id = g.id) as student_count
+                   (SELECT COUNT(*) FROM group_students gs WHERE gs.group_id = g.id) as student_count,
+                   (SELECT COUNT(*) FROM assessments a WHERE a.group_id = g.id) as assessment_count
             FROM groups g
             JOIN courses c ON g.course_id = c.id
             WHERE g.course_id = ?
@@ -42,7 +43,8 @@ module.exports = (pool) => {
         } else {
           query = `
             SELECT g.*, c.name as course_name,
-                   (SELECT COUNT(*) FROM group_students gs WHERE gs.group_id = g.id) as student_count
+                   (SELECT COUNT(*) FROM group_students gs WHERE gs.group_id = g.id) as student_count,
+                   (SELECT COUNT(*) FROM assessments a WHERE a.group_id = g.id) as assessment_count
             FROM groups g
             JOIN courses c ON g.course_id = c.id
             ORDER BY c.name, g.name`;
@@ -53,7 +55,8 @@ module.exports = (pool) => {
         if (courseId) {
           query = `
             SELECT g.*, c.name as course_name,
-                   (SELECT COUNT(*) FROM group_students gs WHERE gs.group_id = g.id) as student_count
+                   (SELECT COUNT(*) FROM group_students gs WHERE gs.group_id = g.id) as student_count,
+                   (SELECT COUNT(*) FROM assessments a WHERE a.group_id = g.id) as assessment_count
             FROM groups g
             JOIN courses c ON g.course_id = c.id
             JOIN group_students gs ON g.id = gs.group_id
@@ -63,7 +66,8 @@ module.exports = (pool) => {
         } else {
           query = `
             SELECT g.*, c.name as course_name,
-                   (SELECT COUNT(*) FROM group_students gs WHERE gs.group_id = g.id) as student_count
+                   (SELECT COUNT(*) FROM group_students gs WHERE gs.group_id = g.id) as student_count,
+                   (SELECT COUNT(*) FROM assessments a WHERE a.group_id = g.id) as assessment_count
             FROM groups g
             JOIN courses c ON g.course_id = c.id
             JOIN group_students gs ON g.id = gs.group_id
