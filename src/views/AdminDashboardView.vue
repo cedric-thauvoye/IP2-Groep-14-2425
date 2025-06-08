@@ -3,9 +3,6 @@
         <div class="admin-dashboard">
             <h1>Admin Dashboard</h1>
 
-            <!-- Add debug component in development mode -->
-            <UserRoleDebug v-if="isDevelopmentMode" />
-
             <!-- Admin Navigation -->
             <div class="admin-nav">
                 <div class="nav-pills">
@@ -64,21 +61,6 @@
                             <div class="stat-breakdown">
                                 <span>{{ stats.activeAssessmentsCount }} Active</span>
                                 <span>{{ stats.completedAssessmentsCount }} Completed</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="recent-activity">
-                    <h2>Recent Activity</h2>
-                    <div class="activity-list">
-                        <div v-for="(activity, index) in recentActivities" :key="index" class="activity-item">
-                            <div class="activity-icon" :class="activity.type">
-                                <i :class="activity.icon"></i>
-                            </div>
-                            <div class="activity-content">
-                                <p class="activity-text">{{ activity.text }}</p>
-                                <span class="activity-time">{{ activity.time }}</span>
                             </div>
                         </div>
                     </div>
@@ -376,8 +358,17 @@
                                 </select>
                             </div>
                             <div v-if="editingUser.role === 'student'" class="form-group">
-                                <label for="q-number">Q-Number</label>
-                                <input type="text" id="q-number" v-model="editingUser.q_number" required />
+                                <label for="q-number">q-Number</label>
+                                <input
+                                    type="text"
+                                    id="q-number"
+                                    v-model="editingUser.q_number"
+                                    required
+                                    placeholder="Enter q-number (e.g., q12345678)"
+                                    pattern="q[0-9]{8}"
+                                    title="q-number should start with 'q' followed by 8 digits"
+                                    @input="formatQNumberEdit"
+                                />
                             </div>
                             <div class="form-actions">
                                 <button type="button" class="cancel-button" @click="showEditUserModal = false">Cancel</button>
@@ -415,17 +406,210 @@
                 </div>
             </div>
         </div>
+
+        <!-- Add Course Modal -->
+        <div v-if="showCourseModal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Create New Course</h2>
+                    <button class="close-button" @click="showCourseModal = false">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form @submit.prevent="createNewCourse">
+                        <div class="form-group">
+                            <label for="new-course-name">Course Name *</label>
+                            <input
+                                type="text"
+                                id="new-course-name"
+                                v-model="newCourse.name"
+                                required
+                                placeholder="Enter course name"
+                            />
+                        </div>
+                        <div class="form-group">
+                            <label for="new-course-code">Course Code *</label>
+                            <input
+                                type="text"
+                                id="new-course-code"
+                                v-model="newCourse.code"
+                                required
+                                placeholder="Enter course code"
+                            />
+                        </div>
+                        <div class="form-group">
+                            <label for="new-course-description">Description</label>
+                            <textarea
+                                id="new-course-description"
+                                v-model="newCourse.description"
+                                rows="4"
+                                placeholder="Enter course description (optional)"
+                            ></textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="cancel-button" @click="showCourseModal = false">
+                                Cancel
+                            </button>
+                            <button type="submit" class="save-button" :disabled="isCreatingCourse">
+                                <i v-if="isCreatingCourse" class="fas fa-spinner fa-spin"></i>
+                                <span v-else>Create Course</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Group Modal -->
+        <div v-if="showGroupModal" class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Create New Group</h2>
+                    <button class="close-button" @click="showGroupModal = false">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form @submit.prevent="createNewGroup">
+                        <div class="form-group">
+                            <label for="new-group-name">Group Name *</label>
+                            <input
+                                type="text"
+                                id="new-group-name"
+                                v-model="newGroup.name"
+                                required
+                                placeholder="Enter group name"
+                            />
+                        </div>
+                        <div class="form-group">
+                            <label for="new-group-course">Course *</label>
+                            <select
+                                id="new-group-course"
+                                v-model="newGroup.courseId"
+                                required
+                            >
+                                <option value="" disabled>Select a course</option>
+                                <option v-for="course in courses" :key="course.id" :value="course.id">
+                                    {{ course.name }}
+                                </option>
+                            </select>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="cancel-button" @click="showGroupModal = false">
+                                Cancel
+                            </button>
+                            <button type="submit" class="save-button" :disabled="isCreatingGroup">
+                                <i v-if="isCreatingGroup" class="fas fa-spinner fa-spin"></i>
+                                <span v-else>Create Group</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
         <!-- Add User Modal -->
         <div v-if="showUserModal" class="modal-overlay">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h2>Add New User</h2>
+                    <h2>Create New User</h2>
                     <button class="close-button" @click="showUserModal = false">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
                 <div class="modal-body">
-                    <StudentDetailView @close="showUserModal = false" @created="fetchData" />
+                    <form @submit.prevent="createNewUser">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="new-user-first-name">First Name *</label>
+                                <input
+                                    type="text"
+                                    id="new-user-first-name"
+                                    v-model="newUser.first_name"
+                                    required
+                                    placeholder="Enter first name"
+                                />
+                            </div>
+                            <div class="form-group">
+                                <label for="new-user-last-name">Last Name *</label>
+                                <input
+                                    type="text"
+                                    id="new-user-last-name"
+                                    v-model="newUser.last_name"
+                                    required
+                                    placeholder="Enter last name"
+                                />
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="new-user-email">Email Address *</label>
+                            <input
+                                type="email"
+                                id="new-user-email"
+                                v-model="newUser.email"
+                                required
+                                placeholder="Enter email address"
+                            />
+                        </div>
+                        <div class="form-group">
+                            <label for="new-user-role">Role *</label>
+                            <select
+                                id="new-user-role"
+                                v-model="newUser.role"
+                                required
+                            >
+                                <option value="" disabled>Select a role</option>
+                                <option value="student">Student</option>
+                                <option value="teacher">Teacher</option>
+                                <option value="admin">Administrator</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="new-user-q-number">q-Number *</label>
+                            <input
+                                type="text"
+                                id="new-user-q-number"
+                                v-model="newUser.q_number"
+                                required
+                                placeholder="Enter q-number (e.g., q12345678)"
+                                pattern="q[0-9]{8}"
+                                title="q-number should start with 'q' followed by 8 digits"
+                                @input="formatQNumber"
+                            />
+                        </div>
+                        <div class="form-group">
+                            <label for="new-user-password">Password *</label>
+                            <div class="password-input-group">
+                                <input
+                                    :type="showPassword ? 'text' : 'password'"
+                                    id="new-user-password"
+                                    v-model="newUser.password"
+                                    required
+                                    placeholder="Enter password"
+                                    minlength="6"
+                                />
+                                <button
+                                    type="button"
+                                    class="password-toggle"
+                                    @click="showPassword = !showPassword"
+                                >
+                                    <i :class="showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="button" class="cancel-button" @click="showUserModal = false">
+                                Cancel
+                            </button>
+                            <button type="submit" class="save-button" :disabled="isCreatingUser">
+                                <i v-if="isCreatingUser" class="fas fa-spinner fa-spin"></i>
+                                <i v-else class="fas fa-user-plus"></i>
+                                <span v-if="isCreatingUser">Creating User...</span>
+                                <span v-else>Create User</span>
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -433,20 +617,15 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
-import { courseService, groupService, authService, userService } from '../services/api';
-import UserRoleDebug from '../components/Debug/UserRoleDebug.vue';
-import notificationStore from '../stores/notificationStore';
-import StudentDetailView from '@/views/StudentDetailView.vue';
-import { assessmentService } from '../services/api';
+import { courseService, groupService, authService, userService, assessmentService } from '../services/api';
+import { useNotificationStore } from '../stores/notificationStore';
 
 const router = useRouter();
+const notificationStore = useNotificationStore();
 const activeTab = ref('overview');
-const isDevelopmentMode = computed(() => {
-    return process.env.NODE_ENV === 'development' || import.meta.env.DEV;
-});
 
 // Stats data
 const stats = ref({
@@ -461,34 +640,6 @@ const stats = ref({
     activeAssessmentsCount: 0,
     completedAssessmentsCount: 0
 });
-
-// Activity data
-const recentActivities = ref([
-    {
-        type: 'user',
-        icon: 'fas fa-user',
-        text: 'New teacher account created: John Smith',
-        time: '2 hours ago'
-    },
-    {
-        type: 'course',
-        icon: 'fas fa-book',
-        text: 'New course added: Advanced Programming',
-        time: '1 day ago'
-    },
-    {
-        type: 'group',
-        icon: 'fas fa-users',
-        text: 'New group created: Project Team 3',
-        time: '2 days ago'
-    },
-    {
-        type: 'assessment',
-        icon: 'fas fa-tasks',
-        text: 'New assessment added to Web Development',
-        time: '3 days ago'
-    }
-]);
 
 // Data arrays
 const courses = ref([]);
@@ -524,6 +675,32 @@ const deleteType = ref('');
 const deleteObject = ref(null);
 const deleteMessage = ref('');
 const adminPassword = ref('');
+
+// Add new item states
+const newCourse = ref({
+    name: '',
+    code: '',
+    description: ''
+});
+
+const newGroup = ref({
+    name: '',
+    courseId: ''
+});
+
+const newUser = ref({
+    first_name: '',
+    last_name: '',
+    email: '',
+    role: '',
+    q_number: '',
+    password: 'Password123'
+});
+
+const isCreatingCourse = ref(false);
+const isCreatingGroup = ref(false);
+const isCreatingUser = ref(false);
+const showPassword = ref(false);
 
 // Filter functions
 const filterCourses = () => {
@@ -637,6 +814,147 @@ const saveEditedUser = async () => {
         editingUser.value = null;
     } catch (error) {
         console.error('Error saving edited user:', error);
+    }
+};
+
+// Create new course
+const createNewCourse = async () => {
+    try {
+        isCreatingCourse.value = true;
+
+        const response = await courseService.createCourse(newCourse.value);
+
+        // Add new course to the list
+        const newCourseData = {
+            ...response.data,
+            status: 'active', // Default status
+            studentCount: 0,
+            teacherCount: 1, // Creator is automatically added as teacher
+            groupCount: 0
+        };
+
+        courses.value.push(newCourseData);
+        filterCourses();
+
+        // Reset form and close modal
+        newCourse.value = {
+            name: '',
+            code: '',
+            description: ''
+        };
+        showCourseModal.value = false;
+
+        // Update stats and show success message
+        fetchStats();
+        notificationStore.success('Course created successfully!');
+
+    } catch (error) {
+        console.error('Error creating course:', error);
+        notificationStore.error('Failed to create course. Please check if the course code is unique.');
+    } finally {
+        isCreatingCourse.value = false;
+    }
+};
+
+// Create new group
+const createNewGroup = async () => {
+    try {
+        isCreatingGroup.value = true;
+
+        const groupData = {
+            name: newGroup.value.name,
+            courseId: newGroup.value.courseId
+        };
+
+        const response = await groupService.createGroup(groupData);
+
+        // Find the course name for the new group
+        const course = courses.value.find(c => c.id === newGroup.value.courseId);
+
+        // Add new group to the list
+        const newGroupData = {
+            ...response.data,
+            course_id: newGroup.value.courseId,
+            course_name: course ? course.name : 'Unknown Course',
+            student_count: 0,
+            assessment_count: 0
+        };
+
+        groups.value.push(newGroupData);
+        filterGroups();
+
+        // Reset form and close modal
+        newGroup.value = {
+            name: '',
+            courseId: ''
+        };
+        showGroupModal.value = false;
+
+        // Update stats and show success message
+        fetchStats();
+        notificationStore.success('Group created successfully!');
+
+    } catch (error) {
+        console.error('Error creating group:', error);
+        notificationStore.error('Failed to create group. Please try again.');
+    } finally {
+        isCreatingGroup.value = false;
+    }
+};
+
+// Create new user
+const createNewUser = async () => {
+    try {
+        isCreatingUser.value = true;
+
+        const response = await userService.createUser(newUser.value);
+
+        // Add new user to the list
+        const newUserData = {
+            ...response.data,
+            courseCount: 0,
+            groupCount: 0
+        };
+
+        users.value.push(newUserData);
+        filterUsers();
+
+        // Reset form and close modal
+        newUser.value = {
+            first_name: '',
+            last_name: '',
+            email: '',
+            role: '',
+            q_number: '',
+            password: 'Password123'
+        };
+        showUserModal.value = false;
+        showPassword.value = false;
+
+        // Update stats and show success message
+        fetchStats();
+        notificationStore.success(`${newUserData.role.charAt(0).toUpperCase() + newUserData.role.slice(1)} created successfully!`);
+
+    } catch (error) {
+        console.error('Error creating user:', error);
+        notificationStore.error('Failed to create user. Please check if the email is unique.');
+    } finally {
+        isCreatingUser.value = false;
+    }
+};
+
+// Format Q-number to always use lowercase 'q'
+const formatQNumber = (event) => {
+    const value = event.target.value;
+    if (value.length > 0 && (value[0] === 'Q' || value[0] === 'q')) {
+        newUser.value.q_number = 'q' + value.slice(1);
+    }
+};
+
+const formatQNumberEdit = (event) => {
+    const value = event.target.value;
+    if (value.length > 0 && (value[0] === 'Q' || value[0] === 'q')) {
+        editingUser.value.q_number = 'q' + value.slice(1);
     }
 };
 
@@ -1427,5 +1745,63 @@ onMounted(() => {
 .course-link:hover {
     text-decoration: underline;
     color: #2980b9;
+}
+
+/* Enhanced form styles for user creation */
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.password-input-group {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.password-input-group input {
+    flex: 1;
+    padding-right: 3rem;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 0.75rem;
+    background: none;
+    border: none;
+    color: #6c757d;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 4px;
+    transition: color 0.2s ease;
+}
+
+.password-toggle:hover {
+    color: #3498db;
+}
+
+.form-hint {
+    color: #6c757d;
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+    display: block;
+}
+
+.save-button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.save-button i {
+    font-size: 0.9rem;
+}
+
+@media (max-width: 768px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
 }
 </style>

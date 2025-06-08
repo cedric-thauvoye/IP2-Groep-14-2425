@@ -74,7 +74,7 @@
                             <div class="intro-text">
                                 <h3>How it works</h3>
                                 <p v-if="importType === 'students'">Upload a CSV file containing student information. We'll validate the data and let you review it before importing.</p>
-                                <p v-else>Upload an XLSX file containing group information and student assignments. We'll validate the data and let you review it before importing.</p>
+                                <p v-else>Upload an CSV or XLSX file containing group information and student assignments. We'll validate the data and let you review it before importing.</p>
                             </div>
                         </div>
                     </div>
@@ -118,7 +118,7 @@
                                 Supported formats: CSV and XLSX files • Max size: 5MB
                             </p>
                             <p class="file-requirements" v-else>
-                                Supported formats: XLSX files • Max size: 5MB
+                                Supported formats: CSV and XLSX files • Max size: 5MB
                             </p>
                         </div>
 
@@ -476,10 +476,7 @@ export default {
                 this.availableCourses = response.data;
             } catch (error) {
                 console.error('Error loading courses:', error);
-                this.notificationStore.addNotification({
-                    type: 'error',
-                    message: 'Failed to load courses'
-                });
+                this.notificationStore.error('Failed to load courses');
             }
         },
         // File handling methods
@@ -503,28 +500,19 @@ export default {
             const fileName = file.name.toLowerCase();
             if (this.importType === 'students') {
                 if (!fileName.endsWith('.csv') && !fileName.endsWith('.xlsx')) {
-                    this.notificationStore.addNotification({
-                        type: 'error',
-                        message: 'Please select a CSV or XLSX file'
-                    });
+                    this.notificationStore.error('Please select a CSV or XLSX file');
                     return;
                 }
             } else if (this.importType === 'groups') {
                 if (!fileName.endsWith('.xlsx')) {
-                    this.notificationStore.addNotification({
-                        type: 'error',
-                        message: 'Please select an XLSX file for group import'
-                    });
+                    this.notificationStore.error('Please select an CSV or XLSX file for group import');
                     return;
                 }
             }
 
             // Validate file size (5MB limit)
             if (file.size > 5 * 1024 * 1024) {
-                this.notificationStore.addNotification({
-                    type: 'error',
-                    message: 'File size must be less than 5MB'
-                });
+                this.notificationStore.error('File size must be less than 5MB');
                 return;
             }
 
@@ -581,16 +569,10 @@ export default {
                 document.body.removeChild(link);
                 window.URL.revokeObjectURL(url);
 
-                this.notificationStore.addNotification({
-                    type: 'success',
-                    message: 'Template downloaded successfully'
-                });
+                this.notificationStore.success('Template downloaded successfully');
             } catch (error) {
                 console.error('Download template error:', error);
-                this.notificationStore.addNotification({
-                    type: 'error',
-                    message: 'Failed to download template'
-                });
+                this.notificationStore.error('Failed to download template');
             } finally {
                 this.downloading = false;
             }
@@ -601,10 +583,7 @@ export default {
             if (!this.selectedFile) return;
 
             if (this.importType === 'groups' && !this.selectedCourseId) {
-                this.notificationStore.addNotification({
-                    type: 'error',
-                    message: 'Please select a course before uploading the file'
-                });
+                this.notificationStore.error('Please select a course before uploading the file');
                 return;
             }
 
@@ -643,17 +622,13 @@ export default {
                 this.currentStep = 2;
 
                 if (this.previewResponse.errors.length > 0) {
-                    this.notificationStore.addNotification({
-                        type: 'warning',
-                        message: `Found ${this.previewResponse.errors.length} validation errors. Please review and fix before importing.`
-                    });
+                    this.notificationStore.warning(
+                        `Found ${this.previewResponse.errors.length} validation errors. Please review and fix before importing.`
+                    );
                 }
             } catch (error) {
                 console.error('Preview error:', error);
-                this.notificationStore.addNotification({
-                    type: 'error',
-                    message: error.response?.data?.message || 'Failed to process file'
-                });
+                this.notificationStore.error(error.response?.data?.message || 'Failed to process file');
             } finally {
                 this.processing = false;
             }
@@ -798,24 +773,19 @@ export default {
                 this.currentStep = 3;
 
                 if (this.importResults.totalImported > 0) {
-                    this.notificationStore.addNotification({
-                        type: 'success',
-                        message: `Successfully imported ${this.importResults.totalImported} ${this.importType === 'students' ? 'students' : 'group assignments'}`
-                    });
+                    this.notificationStore.success(
+                        `Successfully imported ${this.importResults.totalImported} ${this.importType === 'students' ? 'students' : 'group assignments'}`
+                    );
                 }
 
                 if (this.importResults.errors?.length > 0) {
-                    this.notificationStore.addNotification({
-                        type: 'warning',
-                        message: `${this.importResults.errors.length} ${this.importType === 'students' ? 'students' : 'group assignments'} failed to import`
-                    });
+                    this.notificationStore.warning(
+                        `${this.importResults.errors.length} ${this.importType === 'students' ? 'students' : 'group assignments'} failed to import`
+                    );
                 }
             } catch (error) {
                 console.error('Import error:', error);
-                this.notificationStore.addNotification({
-                    type: 'error',
-                    message: error.response?.data?.message || `Failed to import ${this.importType}`
-                });
+                this.notificationStore.error(error.response?.data?.message || `Failed to import ${this.importType}`);
             } finally {
                 this.importing = false;
             }

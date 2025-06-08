@@ -95,7 +95,7 @@
                   </p>
                 </div>
                 <div class="assessment-actions">
-                  <router-link :to="`/assessment/${assessment.id}`" class="view-button">
+                  <router-link :to="`/assessment/${assessment.id}/results`" class="view-button">
                     View Details
                   </router-link>
                 </div>
@@ -225,7 +225,7 @@
 
       <!-- Create Assessment Modal -->
       <div v-if="showCreateAssessmentModal" class="modal-overlay">
-        <div class="modal-content">
+        <div class="modal-content assessment-modal">
           <div class="modal-header">
             <h2>Create Assessment</h2>
             <button class="close-button" @click="showCreateAssessmentModal = false">
@@ -235,85 +235,89 @@
           <div class="modal-body">
             <form @submit.prevent="submitNewAssessment">
               <div class="form-group">
-                <label for="assessment-title">Title</label>
+                <label for="title">Title *</label>
                 <input
-                  type="text"
-                  id="assessment-title"
+                  id="title"
                   v-model="newAssessment.title"
+                  type="text"
                   required
-                >
+                  placeholder="Enter assessment title"
+                />
               </div>
+
               <div class="form-group">
-                <label for="assessment-description">Description</label>
+                <label for="description">Description *</label>
                 <textarea
-                  id="assessment-description"
+                  id="description"
                   v-model="newAssessment.description"
-                  rows="3"
+                  required
+                  placeholder="Enter assessment description"
                 ></textarea>
               </div>
+
               <div class="form-group">
-                <label for="assessment-due-date">Due Date</label>
+                <label for="dueDate">Due Date *</label>
                 <input
-                  type="datetime-local"
-                  id="assessment-due-date"
+                  id="dueDate"
                   v-model="newAssessment.dueDate"
+                  type="datetime-local"
                   required
-                >
+                />
               </div>
 
-              <div class="assessment-criteria">
-                <h3>Criteria</h3>
-                <div
-                  v-for="(criterion, index) in newAssessment.criteria"
-                  :key="index"
-                  class="criterion-item"
-                >
+              <div class="criteria-section">
+                <h3>Assessment Criteria</h3>
+                <p class="hint">Add at least one criterion to evaluate</p>
+
+                <div v-for="(criterion, index) in newAssessment.criteria" :key="index" class="criterion-item">
                   <div class="criterion-header">
                     <h4>Criterion {{ index + 1 }}</h4>
-                    <button type="button" class="remove-criterion" @click="removeCriterion(index)">
-                      <i class="fas fa-times"></i>
-                    </button>
+                    <button type="button" class="remove-button" @click="removeCriterion(index)">&times;</button>
                   </div>
 
                   <div class="form-group">
-                    <label :for="`criterion-name-${index}`">Name</label>
+                    <label :for="'criterion-name-' + index">Name *</label>
                     <input
-                      type="text"
-                      :id="`criterion-name-${index}`"
+                      :id="'criterion-name-' + index"
                       v-model="criterion.name"
+                      type="text"
                       required
-                    >
+                      placeholder="e.g., Teamwork, Communication"
+                    />
                   </div>
 
                   <div class="form-group">
-                    <label :for="`criterion-description-${index}`">Description</label>
+                    <label :for="'criterion-desc-' + index">Description</label>
                     <textarea
-                      :id="`criterion-description-${index}`"
+                      :id="'criterion-desc-' + index"
                       v-model="criterion.description"
-                      rows="2"
+                      placeholder="Explain what students should evaluate"
                     ></textarea>
                   </div>
 
-                  <div class="form-row">
+                  <div class="scores-range">
                     <div class="form-group">
-                      <label :for="`criterion-min-score-${index}`">Min Score</label>
+                      <label :for="'min-score-' + index">Min Score</label>
                       <input
+                        :id="'min-score-' + index"
+                        v-model.number="criterion.minScore"
                         type="number"
-                        :id="`criterion-min-score-${index}`"
-                        v-model="criterion.minScore"
-                        required
                         min="0"
-                      >
-                    </div>
-                    <div class="form-group">
-                      <label :for="`criterion-max-score-${index}`">Max Score</label>
-                      <input
-                        type="number"
-                        :id="`criterion-max-score-${index}`"
-                        v-model="criterion.maxScore"
+                        max="9"
                         required
+                      />
+                    </div>
+
+                    <div class="form-group">
+                      <label :for="'max-score-' + index">Max Score</label>
+                      <input
+                        :id="'max-score-' + index"
+                        v-model.number="criterion.maxScore"
+                        type="number"
                         min="1"
-                      >
+                        max="10"
+                        required
+                      />
                     </div>
                   </div>
                 </div>
@@ -324,12 +328,10 @@
               </div>
 
               <div class="form-actions">
-                <button type="button" class="cancel-button" @click="showCreateAssessmentModal = false">
-                  Cancel
-                </button>
+                <button type="button" class="cancel-button" @click="showCreateAssessmentModal = false">Cancel</button>
                 <button
                   type="submit"
-                  class="save-button"
+                  class="create-button"
                   :disabled="!isAssessmentFormValid || submittingAssessment"
                 >
                   <i v-if="submittingAssessment" class="fas fa-spinner fa-spin"></i>
@@ -406,7 +408,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
-import { groupService, authService, assessmentService, userService } from '../services/api';
+import { groupService, authService, assessmentService } from '../services/api';
 import { useNotificationStore } from '../stores/notificationStore';
 
 const router = useRouter();
@@ -429,6 +431,21 @@ const submittingAssessment = ref(false);
 const showDeleteModal = ref(false);
 const showStudentDeleteModal = ref(false);
 const studentToDelete = ref(null);
+
+// New assessment form data
+const newAssessment = ref({
+  title: '',
+  description: '',
+  dueDate: '',
+  criteria: [
+    {
+      name: '',
+      description: '',
+      minScore: 0,
+      maxScore: 10
+    }
+  ]
+});
 
 // Format date function
 const formatDate = (dateString) => {
@@ -486,26 +503,6 @@ const deleteGroup = async () => {
   }
 };
 
-// Add student to group
-const addStudent = async (studentId) => {
-  try {
-    await groupService.addStudentToGroup(group.value.id, studentId);
-    notificationStore.success('Student added to group successfully.');
-    // Refresh both group data and available students list
-    const promises = [fetchGroupDetails()];
-    if (isTeacher.value) {
-      promises.push(fetchAvailableStudents());
-    }
-    await Promise.all(promises);
-    // Reset search query and refilter students
-    studentSearchQuery.value = '';
-    filterStudents();
-  } catch (err) {
-    console.error('Error adding student:', err);
-    notificationStore.error('Failed to add student. Please try again.');
-  }
-};
-
 // Initialize student removal
 const removeStudent = (studentId) => {
   studentToDelete.value = group.value.students.find(student => student.id === studentId);
@@ -536,10 +533,6 @@ const handleStudentRemoval = async () => {
 
 // Create assessment for group
 const createAssessment = () => {
-  // Set groupId and courseId
-  newAssessment.value.groupId = group.value.id;
-  newAssessment.value.courseId = group.value.course_id;
-
   // Format date to ISO string
   if (!newAssessment.value.dueDate) {
     // Set default due date to 7 days from now
@@ -557,7 +550,7 @@ const addCriterion = () => {
   newAssessment.value.criteria.push({
     name: '',
     description: '',
-    minScore: 1,
+    minScore: 0,
     maxScore: 10
   });
 };
@@ -578,13 +571,13 @@ const submitNewAssessment = async () => {
   submittingAssessment.value = true;
 
   try {
-    // Format data for API
+    // Format data for API - use groupIds array to match AssessmentsView format
     const assessmentData = {
       title: newAssessment.value.title,
       description: newAssessment.value.description,
       dueDate: new Date(newAssessment.value.dueDate).toISOString(),
-      groupId: newAssessment.value.groupId,
-      courseId: newAssessment.value.courseId,
+      groupIds: [group.value.id], // Send as array like AssessmentsView
+      courseId: group.value.course_id, // Use the group's course ID (correct field name)
       criteria: newAssessment.value.criteria.map(c => ({
         name: c.name,
         description: c.description,
@@ -596,18 +589,19 @@ const submitNewAssessment = async () => {
     // Call API to create assessment
     await assessmentService.createAssessment(assessmentData);
 
+    // Show success notification
+    notificationStore.success('Assessment created successfully!');
+
     // Reset form
     newAssessment.value = {
       title: '',
       description: '',
       dueDate: '',
-      groupId: '',
-      courseId: '',
       criteria: [
         {
-          name: 'Participation',
-          description: 'Level of participation in group activities',
-          minScore: 1,
+          name: '',
+          description: '',
+          minScore: 0,
           maxScore: 10
         }
       ]
@@ -621,7 +615,7 @@ const submitNewAssessment = async () => {
 
   } catch (err) {
     console.error('Error creating assessment:', err);
-    error.value = 'Failed to create assessment. Please try again.';
+    notificationStore.error('Failed to create assessment. Please try again.');
   } finally {
     submittingAssessment.value = false;
   }
@@ -631,6 +625,7 @@ const submitNewAssessment = async () => {
 const isAssessmentFormValid = computed(() => {
   return (
     newAssessment.value.title.trim() !== '' &&
+    newAssessment.value.description.trim() !== '' &&
     newAssessment.value.dueDate !== '' &&
     newAssessment.value.criteria.length > 0 &&
     newAssessment.value.criteria.every(
@@ -1233,6 +1228,198 @@ onMounted(async () => {
 .close-button:hover {
   color: #e74c3c;
   background-color: #f8f9fa;
+}
+
+/* Assessment Modal Specific Styles - matching AssessmentsView */
+.assessment-modal {
+  width: 800px;
+  max-width: 95%;
+}
+
+.assessment-modal .modal-body {
+  padding: 2rem;
+}
+
+.assessment-modal .form-group {
+  margin-bottom: 1.5rem;
+}
+
+.assessment-modal .form-group label {
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 0.75rem;
+  font-size: 0.95rem;
+}
+
+.assessment-modal .form-group input,
+.assessment-modal .form-group textarea {
+  padding: 0.75rem 1rem;
+  border: 2px solid #e1e1e1;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  transition: border-color 0.2s ease;
+}
+
+.assessment-modal .form-group input:focus,
+.assessment-modal .form-group textarea:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.assessment-modal .form-group input::placeholder,
+.assessment-modal .form-group textarea::placeholder {
+  color: #95a5a6;
+}
+
+/* Criteria Section */
+.criteria-section {
+  margin-top: 2rem;
+}
+
+.criteria-section h3 {
+  color: #2c3e50;
+  margin-bottom: 0.5rem;
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.hint {
+  color: #7f8c8d;
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+  font-style: italic;
+}
+
+/* Criterion Items */
+.criterion-item {
+  background-color: white;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  border-radius: 8px;
+  border: 1px solid #e1e1e1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.criterion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.criterion-header h4 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 1.1rem;
+}
+
+.remove-button {
+  background: none;
+  border: none;
+  color: #e74c3c;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  line-height: 1;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.remove-button:hover {
+  background: rgba(231, 76, 60, 0.1);
+  transform: scale(1.1);
+}
+
+.scores-range {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.scores-range .form-group {
+  margin-bottom: 0;
+}
+
+.scores-range input {
+  width: 100%;
+}
+
+/* Add Criterion Button */
+.add-criterion-button {
+  width: 100%;
+  padding: 0.75rem;
+  background: #3498db;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  margin-top: 1rem;
+}
+
+.add-criterion-button:hover {
+  background: #2980b9;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.add-criterion-button i {
+  font-size: 0.9rem;
+}
+
+/* Form Actions */
+.assessment-modal .form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e1e1e1;
+}
+
+.assessment-modal .cancel-button {
+  padding: 0.75rem 1.5rem;
+  border: 1px solid #e74c3c;
+  background: white;
+  color: #e74c3c;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.assessment-modal .cancel-button:hover {
+  background: #e74c3c;
+  color: white;
+}
+
+.create-button {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  background: #2ecc71;
+  color: white;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.create-button:hover:not(:disabled) {
+  background: #27ae60;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.create-button:disabled {
+  background: #95a5a6;
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 
 @media (max-width: 992px) {
