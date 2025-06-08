@@ -5,14 +5,56 @@
                 <h1>Students</h1>
                 <div class="actions" v-if="isAdmin">
                     <router-link to="/import" class="action-button"> <i class="fas fa-file-import"></i> Import Students </router-link>
+                    <button class="action-button export-button" @click="exportStudents">
+                        <i class="fas fa-file-export"></i> Export XLSX
+                    </button>
                     <button class="action-button" @click="showAddStudentModal = true"><i class="fas fa-user-plus"></i> Add Student</button>
                 </div>
             </div>
 
-            <div class="filters">
-                <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input type="text" v-model="searchQuery" placeholder="Search students..." @input="filterStudents" />
+            <div class="filters-section">
+                <div class="filters-row">
+                    <div class="search-box">
+                        <i class="fas fa-search"></i>
+                        <input type="text" v-model="searchQuery" placeholder="Search students..." @input="filterStudents" />
+                    </div>
+
+                    <div class="filter-group">
+                        <select v-model="filters.courseFilter" @change="filterStudents" class="filter-select">
+                            <option value="all">All Courses</option>
+                            <option value="enrolled">Has Enrollments</option>
+                            <option value="unenrolled">No Enrollments</option>
+                            <option v-for="course in availableCourses" :key="course.id" :value="course.id">
+                                {{ course.name }}
+                            </option>
+                        </select>
+
+                        <select v-model="filters.qNumberFilter" @change="filterStudents" class="filter-select">
+                            <option value="all">All Q-Numbers</option>
+                            <option value="valid">Valid Format</option>
+                            <option value="missing">Missing Q-Number</option>
+                        </select>
+
+                        <select v-model="sortBy" @change="sortStudents" class="filter-select">
+                            <option value="name-asc">Name (A-Z)</option>
+                            <option value="name-desc">Name (Z-A)</option>
+                            <option value="email-asc">Email (A-Z)</option>
+                            <option value="email-desc">Email (Z-A)</option>
+                            <option value="qnumber-asc">Q-Number (A-Z)</option>
+                            <option value="qnumber-desc">Q-Number (Z-A)</option>
+                        </select>
+                    </div>
+
+                    <button v-if="hasActiveFilters" @click="clearFilters" class="clear-filters">
+                        <i class="fas fa-times"></i> Clear Filters
+                    </button>
+                </div>
+
+                <div class="results-info" v-if="students.length > 0">
+                    Showing {{ filteredStudents.length }} of {{ students.length }} students
+                    <span v-if="hasActiveFilters" class="filter-indicator">
+                        (filtered)
+                    </span>
                 </div>
             </div>
 
@@ -28,6 +70,7 @@
                             <th>Name</th>
                             <th>Email</th>
                             <th>Q-Number</th>
+                            <th>Enrollments</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -35,7 +78,24 @@
                         <tr v-for="student in filteredStudents" :key="student.id">
                             <td>{{ student.first_name }} {{ student.last_name }}</td>
                             <td>{{ student.email }}</td>
-                            <td>{{ student.q_number }}</td>
+                            <td>
+                                <span :class="{ 'invalid-qnumber': !isValidQNumber(student.q_number) }">
+                                    {{ student.q_number || 'Not set' }}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="enrollment-info">
+                                    <span class="enrollment-count">{{ getEnrollmentCount(student.id) }} courses</span>
+                                    <div v-if="getStudentCourses(student.id).length > 0" class="course-list">
+                                        <span v-for="course in getStudentCourses(student.id).slice(0, 2)" :key="course.id" class="course-chip">
+                                            {{ course.name }}
+                                        </span>
+                                        <span v-if="getStudentCourses(student.id).length > 2" class="more-courses">
+                                            +{{ getStudentCourses(student.id).length - 2 }} more
+                                        </span>
+                                    </div>
+                                </div>
+                            </td>
                             <td>
                                 <div class="action-buttons">
                                     <router-link :to="`/user/${student.id}`" class="view-button">
@@ -154,12 +214,13 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
-import { userService, authService } from '../services/api';
+import { userService, authService, courseService } from '../services/api';
 import notificationStore from '../stores/notificationStore';
 import StudentDetailView from '@/views/StudentDetailView.vue';
+import * as XLSX from 'xlsx';
 
 const router = useRouter();
 const students = ref([]);
@@ -180,12 +241,34 @@ const newStudent = ref({
 });
 const isAddingStudent = ref(false);
 
-// Get all students
+// New filtering and export variables
+const availableCourses = ref([]);
+const studentCourses = ref({}); // Map of student ID to courses
+const sortBy = ref('name-asc');
+const filters = ref({
+    courseFilter: 'all',
+    qNumberFilter: 'all'
+});
+
+// Computed property to check if filters are active
+const hasActiveFilters = computed(() => {
+    return searchQuery.value !== '' ||
+           filters.value.courseFilter !== 'all' ||
+           filters.value.qNumberFilter !== 'all' ||
+           sortBy.value !== 'name-asc';
+});
+
+// Get all students and their course enrollments
 const fetchStudents = async () => {
     try {
         const response = await userService.getStudents();
         students.value = response.data;
+
+        // Fetch course enrollments for each student
+        await fetchStudentCourses();
+
         filteredStudents.value = [...students.value];
+        sortStudents();
     } catch (error) {
         console.error('Error fetching students:', error);
     } finally {
@@ -193,18 +276,191 @@ const fetchStudents = async () => {
     }
 };
 
-// Filter students based on search only
-const filterStudents = () => {
-    const searchTerm = searchQuery.value.toLowerCase();
+// Fetch available courses for filtering
+const fetchCourses = async () => {
+    try {
+        const response = await courseService.getCourses();
+        availableCourses.value = response.data;
+    } catch (error) {
+        console.error('Error fetching courses:', error);
+    }
+};
 
-    filteredStudents.value = students.value.filter((student) => {
-        return (
-            student.first_name.toLowerCase().includes(searchTerm) ||
-            student.last_name.toLowerCase().includes(searchTerm) ||
-            student.email.toLowerCase().includes(searchTerm) ||
-            (student.q_number && student.q_number.toLowerCase().includes(searchTerm))
-        );
-    });
+// Fetch course enrollments for students
+const fetchStudentCourses = async () => {
+    try {
+        // Use the existing user detail endpoint which includes courses
+        for (const student of students.value) {
+            try {
+                const response = await userService.getUserById(student.id);
+                studentCourses.value[student.id] = response.data.courses || [];
+            } catch (error) {
+                console.warn(`Could not fetch courses for student ${student.id}:`, error);
+                studentCourses.value[student.id] = [];
+            }
+        }
+    } catch (error) {
+        console.error('Error fetching student courses:', error);
+        // Set empty arrays for all students
+        students.value.forEach(student => {
+            studentCourses.value[student.id] = [];
+        });
+    }
+};
+
+// Utility functions
+const isValidQNumber = (qNumber) => {
+    if (!qNumber) return false;
+    // Assume Q-number format is Q followed by digits (e.g., Q123456)
+    return /^Q\d{6}$/.test(qNumber);
+};
+
+const getEnrollmentCount = (studentId) => {
+    return studentCourses.value[studentId]?.length || 0;
+};
+
+const getStudentCourses = (studentId) => {
+    return studentCourses.value[studentId] || [];
+};
+
+// Enhanced filtering function
+const filterStudents = () => {
+    let filtered = [...students.value];
+
+    // Search filter
+    if (searchQuery.value) {
+        const searchTerm = searchQuery.value.toLowerCase();
+        filtered = filtered.filter((student) => {
+            return (
+                student.first_name.toLowerCase().includes(searchTerm) ||
+                student.last_name.toLowerCase().includes(searchTerm) ||
+                student.email.toLowerCase().includes(searchTerm) ||
+                (student.q_number && student.q_number.toLowerCase().includes(searchTerm))
+            );
+        });
+    }
+
+    // Course filter
+    if (filters.value.courseFilter !== 'all') {
+        if (filters.value.courseFilter === 'enrolled') {
+            filtered = filtered.filter(student => getEnrollmentCount(student.id) > 0);
+        } else if (filters.value.courseFilter === 'unenrolled') {
+            filtered = filtered.filter(student => getEnrollmentCount(student.id) === 0);
+        } else {
+            // Filter by specific course
+            filtered = filtered.filter(student =>
+                getStudentCourses(student.id).some(course => course.id == filters.value.courseFilter)
+            );
+        }
+    }
+
+    // Q-Number filter
+    if (filters.value.qNumberFilter !== 'all') {
+        if (filters.value.qNumberFilter === 'valid') {
+            filtered = filtered.filter(student => isValidQNumber(student.q_number));
+        } else if (filters.value.qNumberFilter === 'missing') {
+            filtered = filtered.filter(student => !student.q_number || student.q_number.trim() === '');
+        }
+    }
+
+    filteredStudents.value = filtered;
+    sortStudents();
+};
+
+// Sorting function
+const sortStudents = () => {
+    const sorted = [...filteredStudents.value];
+
+    const [field, direction] = sortBy.value.split('-');
+    const isAscending = direction === 'asc';
+
+    switch (field) {
+        case 'name':
+            sorted.sort((a, b) => {
+                const nameA = `${a.first_name} ${a.last_name}`.toLowerCase();
+                const nameB = `${b.first_name} ${b.last_name}`.toLowerCase();
+                const result = nameA.localeCompare(nameB);
+                return isAscending ? result : -result;
+            });
+            break;
+        case 'email':
+            sorted.sort((a, b) => {
+                const result = a.email.localeCompare(b.email);
+                return isAscending ? result : -result;
+            });
+            break;
+        case 'qnumber':
+            sorted.sort((a, b) => {
+                const result = (a.q_number || '').localeCompare(b.q_number || '');
+                return isAscending ? result : -result;
+            });
+            break;
+    }
+
+    filteredStudents.value = sorted;
+};
+
+// Clear all filters
+const clearFilters = () => {
+    searchQuery.value = '';
+    filters.value.courseFilter = 'all';
+    filters.value.qNumberFilter = 'all';
+    sortBy.value = 'name-asc';
+    filterStudents();
+};
+
+// Export functionality
+const exportStudents = () => {
+    try {
+        // Prepare data for XLSX export
+        const exportData = filteredStudents.value.map(student => {
+            const courses = getStudentCourses(student.id);
+            const courseNames = courses.map(c => c.name).join('; ');
+
+            return {
+                'Full Name': `${student.first_name} ${student.last_name}`,
+                'First Name': student.first_name,
+                'Last Name': student.last_name,
+                'Email': student.email,
+                'Q-Number': student.q_number || '',
+                'Course Enrollments': courseNames,
+                'Total Courses': courses.length,
+                'Q-Number Valid': isValidQNumber(student.q_number) ? 'Yes' : 'No'
+            };
+        });
+
+        // Create workbook and worksheet
+        const workbook = XLSX.utils.book_new();
+        const worksheet = XLSX.utils.json_to_sheet(exportData);
+
+        // Auto-size columns
+        const columnWidths = [
+            { wch: 20 }, // Full Name
+            { wch: 15 }, // First Name
+            { wch: 15 }, // Last Name
+            { wch: 30 }, // Email
+            { wch: 12 }, // Q-Number
+            { wch: 40 }, // Course Enrollments
+            { wch: 12 }, // Total Courses
+            { wch: 15 }  // Q-Number Valid
+        ];
+        worksheet['!cols'] = columnWidths;
+
+        // Add worksheet to workbook
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Students');
+
+        // Generate filename with current date
+        const currentDate = new Date().toISOString().split('T')[0];
+        const filename = `students_export_${currentDate}.xlsx`;
+
+        // Write and download file
+        XLSX.writeFile(workbook, filename);
+
+        notificationStore.success(`Exported ${filteredStudents.value.length} students to ${filename}`);
+    } catch (error) {
+        console.error('Error exporting students:', error);
+        notificationStore.error('Failed to export students. Please try again.');
+    }
 };
 
 // Check if user is an admin
@@ -276,6 +532,7 @@ const addStudent = async () => {
 
 onMounted(async () => {
     await checkUserRole();
+    await fetchCourses();
     await fetchStudents();
 });
 </script>
@@ -315,6 +572,114 @@ onMounted(async () => {
 
 .action-button:hover {
     background-color: #2980b9;
+}
+
+.export-button {
+    background-color: #27ae60;
+}
+
+.export-button:hover {
+    background-color: #229954;
+}
+
+/* Filters Section Styles */
+.filters-section {
+    background: white;
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.filters-row {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.filter-group {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.filter-select {
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: white;
+    font-size: 0.9rem;
+    min-width: 140px;
+}
+
+.clear-filters {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+}
+
+.clear-filters:hover {
+    background: #c0392b;
+}
+
+.results-info {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #eee;
+    color: #7f8c8d;
+    font-size: 0.9rem;
+}
+
+.filter-indicator {
+    color: #e74c3c;
+    font-weight: 500;
+}
+
+/* Table enhancements */
+.invalid-qnumber {
+    color: #e74c3c;
+    font-style: italic;
+}
+
+.enrollment-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.enrollment-count {
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+.course-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.course-chip {
+    background: #ebf5fb;
+    color: #3498db;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    border: 1px solid #d5e8f7;
+}
+
+.more-courses {
+    color: #7f8c8d;
+    font-size: 0.8rem;
+    font-style: italic;
 }
 
 .filters {
@@ -517,12 +882,44 @@ onMounted(async () => {
         gap: 1rem;
     }
 
-    .filters {
+    .actions {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .filters-row {
         flex-direction: column;
+        align-items: stretch;
+        gap: 1rem;
+    }
+
+    .filter-group {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .filter-select {
+        min-width: unset;
+        width: 100%;
     }
 
     .search-box {
         width: 100%;
+    }
+
+    .clear-filters {
+        align-self: flex-start;
+    }
+
+    .students-table th:nth-child(4),
+    .students-table td:nth-child(4) {
+        display: none;
+    }
+
+    .course-list {
+        flex-direction: column;
+        gap: 0.25rem;
     }
 }
 </style>
