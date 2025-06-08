@@ -3,9 +3,6 @@
         <div class="admin-dashboard">
             <h1>Admin Dashboard</h1>
 
-            <!-- Add debug component in development mode -->
-            <UserRoleDebug v-if="isDevelopmentMode" />
-
             <!-- Admin Navigation -->
             <div class="admin-nav">
                 <div class="nav-pills">
@@ -64,21 +61,6 @@
                             <div class="stat-breakdown">
                                 <span>{{ stats.activeAssessmentsCount }} Active</span>
                                 <span>{{ stats.completedAssessmentsCount }} Completed</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="recent-activity">
-                    <h2>Recent Activity</h2>
-                    <div class="activity-list">
-                        <div v-for="(activity, index) in recentActivities" :key="index" class="activity-item">
-                            <div class="activity-icon" :class="activity.type">
-                                <i :class="activity.icon"></i>
-                            </div>
-                            <div class="activity-content">
-                                <p class="activity-text">{{ activity.text }}</p>
-                                <span class="activity-time">{{ activity.time }}</span>
                             </div>
                         </div>
                     </div>
@@ -433,20 +415,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
 import { courseService, groupService, authService, userService } from '../services/api';
-import UserRoleDebug from '../components/Debug/UserRoleDebug.vue';
 import notificationStore from '../stores/notificationStore';
 import StudentDetailView from '@/views/StudentDetailView.vue';
 import { assessmentService } from '../services/api';
 
 const router = useRouter();
 const activeTab = ref('overview');
-const isDevelopmentMode = computed(() => {
-    return process.env.NODE_ENV === 'development' || import.meta.env.DEV;
-});
 
 // Stats data
 const stats = ref({
@@ -461,34 +439,6 @@ const stats = ref({
     activeAssessmentsCount: 0,
     completedAssessmentsCount: 0
 });
-
-// Activity data
-const recentActivities = ref([
-    {
-        type: 'user',
-        icon: 'fas fa-user',
-        text: 'New teacher account created: John Smith',
-        time: '2 hours ago'
-    },
-    {
-        type: 'course',
-        icon: 'fas fa-book',
-        text: 'New course added: Advanced Programming',
-        time: '1 day ago'
-    },
-    {
-        type: 'group',
-        icon: 'fas fa-users',
-        text: 'New group created: Project Team 3',
-        time: '2 days ago'
-    },
-    {
-        type: 'assessment',
-        icon: 'fas fa-tasks',
-        text: 'New assessment added to Web Development',
-        time: '3 days ago'
-    }
-]);
 
 // Data arrays
 const courses = ref([]);
