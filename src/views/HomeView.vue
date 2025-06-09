@@ -75,6 +75,21 @@
                                     <p>{{ course.description || 'No description available' }}</p>
                                 </div>
                             </router-link>
+                            <!-- More courses indicator as a course-like card -->
+                            <router-link
+                                v-if="courses.length > 4"
+                                to="/courses"
+                                class="course-item more-courses-card"
+                            >
+                                <div class="course-color-tag more-courses-tag"></div>
+                                <div class="course-info more-courses-info">
+                                    <h3>
+                                        <i class="fas fa-plus"></i>
+                                        {{ courses.length - 4 }} more {{ courses.length - 4 === 1 ? 'course' : 'courses' }}
+                                    </h3>
+                                    <p>View all your courses</p>
+                                </div>
+                            </router-link>
                         </div>
                         <p v-else class="no-data">You are not enrolled in any courses.</p>
                     </div>
@@ -343,6 +358,44 @@ onMounted(async () => {
     margin: 0.5rem 0 0 0;
     color: #7f8c8d;
     font-size: 0.9rem;
+}
+
+.more-courses-card {
+    border: 2px dashed #3498db !important;
+    background: #f8f9fa !important;
+}
+
+.more-courses-card:hover {
+    background: #e3f2fd !important;
+    border-color: #2980b9 !important;
+}
+
+.more-courses-tag {
+    background: linear-gradient(90deg, #3498db, #2980b9) !important;
+}
+
+.more-courses-info {
+    text-align: center;
+}
+
+.more-courses-info h3 {
+    color: #3498db !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.more-courses-info p {
+    color: #7f8c8d !important;
+    font-style: italic;
+}
+
+.no-data {
+    text-align: center;
+    color: #7f8c8d;
+    font-style: italic;
+    padding: 2rem;
 }
 
 
