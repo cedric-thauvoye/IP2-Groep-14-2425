@@ -157,9 +157,11 @@ module.exports = (pool, bcrypt) => {
                    lowerKey === 'student_id' || lowerKey === 'studentid') {
             normalizedRow['Q Number'] = row[key];
           }
-          // User ID mapping (for groups)
+          // User ID mapping (for groups) - also map to Q Number for students as backup
           else if (lowerKey === 'user_id' || lowerKey === 'userid' || lowerKey === 'user id') {
             normalizedRow['user id'] = row[key];
+            // Also map to Q Number as a backup for student imports
+            normalizedRow['Q Number'] = row[key];
           }
           // Group name mapping
           else if (lowerKey === 'group_name' || lowerKey === 'groupname' || lowerKey === 'group name') {

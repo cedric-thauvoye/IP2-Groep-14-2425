@@ -121,61 +121,123 @@
             </div>
 
             <!-- Student View -->
-            <div v-else-if="activeTab === 'pending' && pendingAssessments.length > 0" class="assessments-grid">
+            <div v-else-if="activeTab === 'pending' && pendingAssessments.length > 0" class="student-assessments-grid">
                 <div v-for="assessment in pendingAssessments"
                      :key="assessment.id"
-                     class="assessment-card"
+                     :class="['student-assessment-card', getDueDateClass(assessment.dueDate)]"
                 >
-                    <div class="assessment-header">
+                    <div class="assessment-status-badge" v-if="isOverdue(assessment.dueDate)">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Overdue
+                    </div>
+                    <div class="assessment-urgency-indicator" :class="getUrgencyClass(assessment.dueDate)"></div>
+
+                    <div class="student-assessment-header">
                         <h3>{{ assessment.title }}</h3>
-                        <span class="due-date">Due: {{ formatDate(assessment.dueDate) }}</span>
-                    </div>
-                    <p class="course-name">{{ assessment.courseName }}</p>
-                    <div class="assessment-content">
-                        <p>{{ assessment.description }}</p>
-                        <div class="progress-bar">
-                            <div class="progress" :style="{ width: assessment.progress + '%' }"></div>
+                        <div class="due-info">
+                            <div :class="['due-date-display', getDueDateClass(assessment.dueDate)]">
+                                <i class="fas fa-clock"></i>
+                                <span class="due-label">Due:</span>
+                                <span class="due-date-time">{{ formatDateTime(assessment.dueDate) }}</span>
+                            </div>
+                            <div class="time-remaining" v-if="!isOverdue(assessment.dueDate)">
+                                {{ getTimeRemaining(assessment.dueDate) }}
+                            </div>
                         </div>
-                        <p class="progress-text">{{ assessment.progress }}% Complete</p>
                     </div>
-                    <div class="assessment-footer">
-                        <button v-if="isStudent" class="start-button" @click="startAssessment(assessment.id)">
-                            Continue Assessment
+
+                    <div class="course-info">
+                        <i class="fas fa-book"></i>
+                        <span>{{ assessment.courseName }}</span>
+                    </div>
+
+                    <div class="student-assessment-content">
+                        <p class="assessment-description">{{ assessment.description }}</p>
+                        <div class="progress-section">
+                            <div class="progress-bar-container">
+                                <div class="progress-bar">
+                                    <div class="progress-fill" :style="{ width: assessment.progress + '%' }"></div>
+                                </div>
+                                <span class="progress-percentage">{{ assessment.progress }}%</span>
+                            </div>
+                            <p class="progress-label">Progress</p>
+                        </div>
+                    </div>
+
+                    <div class="student-assessment-footer">
+                        <button
+                            class="continue-button"
+                            @click="startAssessment(assessment.id)"
+                            :disabled="isOverdue(assessment.dueDate)"
+                        >
+                            <i class="fas fa-play"></i>
+                            {{ assessment.progress > 0 ? 'Continue Assessment' : 'Start Assessment' }}
                         </button>
-                        <button v-else class="view-button" @click="viewResults(assessment.id)">
-                            View Assessment
-                        </button>
+                        <div v-if="isOverdue(assessment.dueDate)" class="overdue-notice">
+                            <i class="fas fa-times-circle"></i>
+                            Too Late to Submit
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div v-else-if="activeTab === 'completed' && completedAssessments.length > 0" class="assessments-grid">
+            <div v-else-if="activeTab === 'completed' && completedAssessments.length > 0" class="student-assessments-grid">
                 <div v-for="assessment in completedAssessments"
                      :key="assessment.id"
-                     class="assessment-card completed"
+                     class="student-assessment-card completed-card"
                 >
-                    <div class="assessment-header">
-                        <h3>{{ assessment.title }}</h3>
-                        <span class="completion-date">Completed: {{ formatDate(assessment.completedDate) }}</span>
+                    <div class="completion-badge">
+                        <i class="fas fa-check-circle"></i>
+                        Completed
                     </div>
-                    <p class="course-name">{{ assessment.courseName }}</p>
-                    <div class="assessment-content">
-                        <p>{{ assessment.description }}</p>
-                        <div class="stats">
-                            <div class="stat">
-                                <span class="label">Score</span>
-                                <span class="value">{{ assessment.score }}</span>
+
+                    <div class="student-assessment-header">
+                        <h3>{{ assessment.title }}</h3>
+                        <div class="completion-info">
+                            <div class="completion-date-display">
+                                <i class="fas fa-calendar-check"></i>
+                                <span class="completion-label">Completed:</span>
+                                <span class="completion-date-time">{{ formatDateTime(assessment.completedDate) }}</span>
                             </div>
-                            <div class="stat">
-                                <span class="label">Time Spent</span>
-                                <span class="value">{{ assessment.timeSpent }}</span>
+                            <div class="submission-status" :class="getSubmissionStatusClass(assessment)">
+                                {{ getSubmissionStatusText(assessment) }}
                             </div>
                         </div>
                     </div>
-                    <div class="assessment-footer">
-                        <button class="view-button" @click="viewResults(assessment.id)">
+
+                    <div class="course-info">
+                        <i class="fas fa-book"></i>
+                        <span>{{ assessment.courseName }}</span>
+                    </div>
+
+                    <div class="student-assessment-content">
+                        <p class="assessment-description">{{ assessment.description }}</p>
+                        <div class="results-section">
+                            <div class="result-item">
+                                <div class="result-icon">
+                                    <i class="fas fa-star"></i>
+                                </div>
+                                <div class="result-details">
+                                    <span class="result-label">Score</span>
+                                    <span class="result-value">{{ assessment.score || 'Pending' }}</span>
+                                </div>
+                            </div>
+                            <div class="result-item">
+                                <div class="result-icon">
+                                    <i class="fas fa-stopwatch"></i>
+                                </div>
+                                <div class="result-details">
+                                    <span class="result-label">Time Spent</span>
+                                    <span class="result-value">{{ assessment.timeSpent || 'N/A' }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="student-assessment-footer">
+                        <button class="results-button" @click="viewResults(assessment.id)">
                             <i class="fas fa-chart-bar"></i>
-                            View Results
+                            View Detailed Results
                         </button>
                     </div>
                 </div>
@@ -403,6 +465,82 @@ const formatDate = (date) => {
         month: 'short',
         day: 'numeric'
     });
+};
+
+const formatDateTime = (date) => {
+    return new Date(date).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+};
+
+const isOverdue = (dueDate) => {
+    return new Date() > new Date(dueDate);
+};
+
+const getDueDateClass = (dueDate) => {
+    const now = new Date();
+    const due = new Date(dueDate);
+    const hoursRemaining = (due - now) / (1000 * 60 * 60);
+
+    if (hoursRemaining < 0) return 'overdue';
+    if (hoursRemaining < 24) return 'urgent';
+    if (hoursRemaining < 72) return 'warning';
+    return 'normal';
+};
+
+const getUrgencyClass = (dueDate) => {
+    const now = new Date();
+    const due = new Date(dueDate);
+    const hoursRemaining = (due - now) / (1000 * 60 * 60);
+
+    if (hoursRemaining < 0) return 'overdue-indicator';
+    if (hoursRemaining < 24) return 'urgent-indicator';
+    if (hoursRemaining < 72) return 'warning-indicator';
+    return 'normal-indicator';
+};
+
+const getTimeRemaining = (dueDate) => {
+    const now = new Date();
+    const due = new Date(dueDate);
+    const msRemaining = due - now;
+
+    if (msRemaining < 0) return 'Overdue';
+
+    const days = Math.floor(msRemaining / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((msRemaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+
+    if (days > 0) {
+        return `${days} day${days > 1 ? 's' : ''} remaining`;
+    } else if (hours > 0) {
+        return `${hours} hour${hours > 1 ? 's' : ''} remaining`;
+    } else {
+        const minutes = Math.floor((msRemaining % (1000 * 60 * 60)) / (1000 * 60));
+        return `${minutes} minute${minutes > 1 ? 's' : ''} remaining`;
+    }
+};
+
+const getSubmissionStatusClass = (assessment) => {
+    if (!assessment.dueDate || !assessment.completedDate) return 'on-time';
+
+    const completed = new Date(assessment.completedDate);
+    const due = new Date(assessment.dueDate);
+
+    if (completed > due) return 'late-submission';
+    return 'on-time';
+};
+
+const getSubmissionStatusText = (assessment) => {
+    if (!assessment.dueDate || !assessment.completedDate) return 'On Time';
+
+    const completed = new Date(assessment.completedDate);
+    const due = new Date(assessment.dueDate);
+
+    if (completed > due) return 'Late Submission';
+    return 'Submitted On Time';
 };
 
 const startAssessment = (id) => {
@@ -1017,6 +1155,385 @@ const openCreateModal = () => {
     margin-bottom: 1rem;
 }
 
+/* Student Assessments Specific Styles */
+.student-assessments-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+}
+
+.student-assessment-card {
+    background: white;
+    border-radius: 12px;
+    padding: 1.25rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    border: 1px solid #e1e1e1;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.student-assessment-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.student-assessment-card.overdue {
+    border-left: 4px solid #e74c3c;
+}
+
+.student-assessment-card.urgent {
+    border-left: 4px solid #f39c12;
+}
+
+.student-assessment-card.warning {
+    border-left: 4px solid #f1c40f;
+}
+
+.student-assessment-card.normal {
+    border-left: 4px solid #27ae60;
+}
+
+.student-assessment-card.completed-card {
+    border-left: 4px solid #3498db;
+}
+
+.assessment-urgency-indicator {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 0;
+    height: 0;
+    border-style: solid;
+}
+
+.overdue-indicator {
+    border-width: 0 30px 30px 0;
+    border-color: transparent #e74c3c transparent transparent;
+}
+
+.urgent-indicator {
+    border-width: 0 25px 25px 0;
+    border-color: transparent #f39c12 transparent transparent;
+}
+
+.warning-indicator {
+    border-width: 0 20px 20px 0;
+    border-color: transparent #f1c40f transparent transparent;
+}
+
+.normal-indicator {
+    border-width: 0 15px 15px 0;
+    border-color: transparent #27ae60 transparent transparent;
+}
+
+.assessment-status-badge {
+    position: absolute;
+    top: 0.6rem;
+    right: 0.6rem;
+    background: #e74c3c;
+    color: white;
+    padding: 0.2rem 0.6rem;
+    border-radius: 15px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.completion-badge {
+    position: absolute;
+    top: 0.6rem;
+    right: 0.6rem;
+    background: #27ae60;
+    color: white;
+    padding: 0.2rem 0.6rem;
+    border-radius: 15px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.student-assessment-header {
+    margin-bottom: 0.75rem;
+}
+
+.student-assessment-header h3 {
+    margin: 0 0 0.5rem 0;
+    color: #2c3e50;
+    font-size: 1.2rem;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.due-info, .completion-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.due-date-display, .completion-date-display {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.due-date-display.overdue {
+    color: #e74c3c;
+}
+
+.due-date-display.urgent {
+    color: #f39c12;
+}
+
+.due-date-display.warning {
+    color: #e67e22;
+}
+
+.due-date-display.normal {
+    color: #27ae60;
+}
+
+.completion-date-display {
+    color: #3498db;
+}
+
+.due-label, .completion-label {
+    font-weight: 400;
+    color: #6c757d;
+}
+
+.due-date-time, .completion-date-time {
+    font-weight: 600;
+}
+
+.time-remaining {
+    font-size: 0.75rem;
+    color: #7f8c8d;
+    font-style: italic;
+}
+
+.submission-status {
+    font-size: 0.8rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 12px;
+    font-weight: 500;
+    align-self: flex-start;
+}
+
+.submission-status.on-time {
+    background: #d4edda;
+    color: #155724;
+}
+
+.submission-status.late-submission {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.course-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    padding: 0.4rem 0.6rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+    color: #6c757d;
+    font-size: 0.85rem;
+}
+
+.student-assessment-content {
+    margin-bottom: 1rem;
+}
+
+.assessment-description {
+    color: #5a6c7d;
+    line-height: 1.4;
+    margin-bottom: 0.75rem;
+    font-size: 0.9rem;
+}
+
+.progress-section {
+    margin-top: 0.75rem;
+}
+
+.progress-bar-container {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.25rem;
+}
+
+.progress-bar {
+    flex: 1;
+    height: 6px;
+    background: #e9ecef;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #3498db, #2ecc71);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
+.progress-percentage {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 0.85rem;
+}
+
+.progress-label {
+    font-size: 0.75rem;
+    color: #7f8c8d;
+    margin: 0;
+}
+
+.results-section {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+}
+
+.result-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+    padding: 0.6rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+}
+
+.result-icon {
+    width: 2rem;
+    height: 2rem;
+    background: #3498db;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 0.8rem;
+}
+
+.result-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.result-label {
+    font-size: 0.75rem;
+    color: #7f8c8d;
+    margin-bottom: 0.1rem;
+}
+
+.result-value {
+    font-weight: 600;
+    color: #2c3e50;
+    font-size: 0.9rem;
+}
+
+.student-assessment-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.continue-button {
+    background: linear-gradient(135deg, #3498db, #2ecc71);
+    color: white;
+    border: none;
+    padding: 0.6rem 1.25rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.continue-button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+}
+
+.continue-button:disabled {
+    background: #bdc3c7;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.results-button {
+    background: linear-gradient(135deg, #9b59b6, #3498db);
+    color: white;
+    border: none;
+    padding: 0.6rem 1.25rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.results-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(155, 89, 182, 0.3);
+}
+
+.overdue-notice {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    color: #e74c3c;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0.4rem;
+    background: #fef5f5;
+    border-radius: 4px;
+    border: 1px solid #fadbd8;
+}
+
+/* Responsive adjustments for student cards */
+@media (max-width: 768px) {
+    .student-assessments-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .student-assessment-card {
+        padding: 1rem;
+    }
+
+    .results-section {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .due-info, .completion-info {
+        gap: 0.25rem;
+    }
+}
+
+/* Teacher Assessment Cards (Legacy) */
 .assessments-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
