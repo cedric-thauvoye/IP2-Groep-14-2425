@@ -143,85 +143,14 @@
       </div>
 
       <!-- Add Student Modal -->
-      <div v-if="showAddStudentModal" class="modal-overlay">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h2>Add Students to Group</h2>
-            <button class="close-button" @click="showAddStudentModal = false">
-              <i class="fas fa-times"></i>
-            </button>
-          </div>
-          <div class="modal-body">
-            <div v-if="loadingStudents" class="loading-indicator">
-              <i class="fas fa-spinner fa-spin"></i>
-              <span>Loading students...</span>
-            </div>
-            <div v-else-if="availableStudents.length === 0" class="no-students">
-              <p>No available students to add to this group.</p>
-            </div>
-            <div v-else>
-              <!-- Selected Students Section -->
-              <div v-if="selectedStudentIds.length > 0" class="selected-students-section">
-                <label>Selected Students ({{ selectedStudentIds.length }})</label>
-                <div class="selected-students">
-                  <div v-for="selectedId in selectedStudentIds" :key="selectedId" class="selected-student-chip">
-                    {{ getSelectedStudentName(selectedId) }}
-                    <button type="button" @click="removeSelectedStudent(selectedId)" class="remove-chip">
-                      <i class="fas fa-times"></i>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Student Selector -->
-              <div class="student-selector">
-                <div class="search-box">
-                  <i class="fas fa-search"></i>
-                  <input
-                    type="text"
-                    v-model="studentSearchQuery"
-                    placeholder="Search students..."
-                    @input="filterStudents"
-                  >
-                </div>
-
-                <div class="students-select-list">
-                  <div
-                    v-for="student in filteredStudents"
-                    :key="student.id"
-                    class="student-select-item"
-                    @click="toggleStudentSelection(student.id)"
-                  >
-                    <div class="student-info">
-                      <div class="student-avatar">
-                        {{ getInitials(student.first_name, student.last_name) }}
-                      </div>
-                      <div class="student-details">
-                        <h3>{{ student.first_name }} {{ student.last_name }}</h3>
-                        <p class="student-email">{{ student.email }}</p>
-                        <p class="student-id">{{ student.q_number }}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="form-actions">
-              <button type="button" class="cancel-button" @click="cancelAddStudents">
-                Cancel
-              </button>
-              <button
-                type="button"
-                class="save-button"
-                @click="addSelectedStudents"
-                :disabled="selectedStudentIds.length === 0"
-              >
-                Add {{ selectedStudentIds.length }} Student{{ selectedStudentIds.length !== 1 ? 's' : '' }}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <AddStudentModal
+        v-model="showAddStudentModal"
+        title="Add Students to Group"
+        :available-students="availableStudents"
+        :loading="loadingStudents"
+        @confirm="addSelectedStudents"
+        @cancel="cancelAddStudents"
+      />
 
       <!-- Create Assessment Modal -->
       <div v-if="showCreateAssessmentModal" class="modal-overlay">
@@ -408,6 +337,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
+import AddStudentModal from '../components/Common/AddStudentModal.vue';
 import { groupService, authService, assessmentService } from '../services/api';
 import { useNotificationStore } from '../stores/notificationStore';
 
@@ -423,9 +353,6 @@ const showEditGroupModal = ref(false);
 const editingGroup = ref(null);
 const loadingStudents = ref(false);
 const availableStudents = ref([]);
-const studentSearchQuery = ref('');
-const filteredStudents = ref([]);
-const selectedStudentIds = ref([]);
 const showCreateAssessmentModal = ref(false);
 const submittingAssessment = ref(false);
 const showDeleteModal = ref(false);
@@ -661,25 +588,12 @@ const fetchAvailableStudents = async () => {
   try {
     const response = await groupService.getAvailableStudents(group.value.id);
     availableStudents.value = response.data;
-    filteredStudents.value = response.data;
   } catch (err) {
     console.error('Error fetching available students:', err);
     availableStudents.value = [];
-    filteredStudents.value = [];
   } finally {
     loadingStudents.value = false;
   }
-};
-
-// Filter students based on search query
-const filterStudents = () => {
-  const query = studentSearchQuery.value.toLowerCase();
-  filteredStudents.value = availableStudents.value.filter(student =>
-    student.first_name.toLowerCase().includes(query) ||
-    student.last_name.toLowerCase().includes(query) ||
-    student.email.toLowerCase().includes(query) ||
-    student.q_number.toLowerCase().includes(query)
-  );
 };
 
 // Check user role
@@ -695,57 +609,29 @@ const checkUserRole = async () => {
 // Open add student modal (teachers only)
 const openAddStudentModal = async () => {
   if (isTeacher.value) {
-    selectedStudentIds.value = [];
-    studentSearchQuery.value = '';
     showAddStudentModal.value = true;
     await fetchAvailableStudents();
   }
 };
 
-// Enhanced student selection methods
-const toggleStudentSelection = (studentId) => {
-  const index = selectedStudentIds.value.indexOf(studentId);
-  if (index === -1) {
-    selectedStudentIds.value.push(studentId);
-  } else {
-    selectedStudentIds.value.splice(index, 1);
-  }
-};
-
-const removeSelectedStudent = (studentId) => {
-  const index = selectedStudentIds.value.indexOf(studentId);
-  if (index !== -1) {
-    selectedStudentIds.value.splice(index, 1);
-  }
-};
-
-const getSelectedStudentName = (studentId) => {
-  const student = availableStudents.value.find(s => s.id === studentId);
-  return student ? `${student.first_name} ${student.last_name}` : '';
-};
-
 const cancelAddStudents = () => {
-  selectedStudentIds.value = [];
-  studentSearchQuery.value = '';
   showAddStudentModal.value = false;
 };
 
-const addSelectedStudents = async () => {
-  if (selectedStudentIds.value.length === 0) return;
+const addSelectedStudents = async (selectedStudents) => {
+  if (selectedStudents.length === 0) return;
 
   try {
     // Add all selected students to the group
-    const promises = selectedStudentIds.value.map(studentId =>
-      groupService.addStudentToGroup(group.value.id, studentId)
+    const promises = selectedStudents.map(student =>
+      groupService.addStudentToGroup(group.value.id, student.id)
     );
 
     await Promise.all(promises);
 
-    notificationStore.success(`${selectedStudentIds.value.length} student${selectedStudentIds.value.length !== 1 ? 's' : ''} added to group successfully.`);
+    notificationStore.success(`${selectedStudents.length} student${selectedStudents.length !== 1 ? 's' : ''} added to group successfully.`);
 
-    // Reset selection and close modal
-    selectedStudentIds.value = [];
-    studentSearchQuery.value = '';
+    // Close modal
     showAddStudentModal.value = false;
 
     // Refresh both group data and available students list
@@ -754,9 +640,6 @@ const addSelectedStudents = async () => {
       refreshPromises.push(fetchAvailableStudents());
     }
     await Promise.all(refreshPromises);
-
-    // Reset filtered students
-    filterStudents();
   } catch (err) {
     console.error('Error adding students:', err);
     notificationStore.error('Failed to add students. Please try again.');
