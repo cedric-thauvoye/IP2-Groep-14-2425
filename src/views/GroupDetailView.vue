@@ -86,18 +86,51 @@
             </div>
 
             <div v-if="group.assessments && group.assessments.length > 0" class="assessments-list">
-              <div v-for="assessment in group.assessments" :key="assessment.id" class="assessment-item">
-                <div class="assessment-info">
+              <!-- Teacher View -->
+              <div v-if="isTeacher" v-for="assessment in group.assessments" :key="assessment.id" class="group-assessment-card">
+                <div class="assessment-header">
                   <h3>{{ assessment.title }}</h3>
-                  <p class="assessment-description">{{ assessment.description }}</p>
-                  <p class="assessment-due-date">
-                    <i class="fas fa-calendar-alt"></i> Due: {{ formatDate(assessment.due_date) }}
-                  </p>
+                  <div class="due-date-info">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>Due: {{ formatDate(assessment.due_date) }}</span>
+                  </div>
                 </div>
-                <div class="assessment-actions">
-                  <router-link :to="`/assessment/${assessment.id}/results`" class="view-button">
+
+                <div class="assessment-content">
+                  <p class="assessment-description">{{ assessment.description }}</p>
+                </div>
+
+                <div class="assessment-footer">
+                  <div class="assessment-status">
+                    <i class="fas fa-tasks"></i>
+                    <span>Group Assessment</span>
+                  </div>
+                  <router-link :to="`/assessment/${assessment.id}/results`" class="view-details-button">
+                    <i class="fas fa-chart-bar"></i>
                     View Details
                   </router-link>
+                </div>
+              </div>
+
+              <!-- Student View -->
+              <div v-else-if="!isTeacher" v-for="assessment in group.assessments" :key="`student-${assessment.id}`" class="group-assessment-card">
+                <div class="assessment-header">
+                  <h3>{{ assessment.title }}</h3>
+                  <div class="due-date-info">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>Due: {{ formatDate(assessment.due_date) }}</span>
+                  </div>
+                </div>
+
+                <div class="assessment-content">
+                  <p class="assessment-description">{{ assessment.description }}</p>
+                </div>
+
+                <div class="assessment-footer">
+                  <div class="assessment-status">
+                    <i class="fas fa-tasks"></i>
+                    <span>Group Assessment</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1305,6 +1338,88 @@ onMounted(async () => {
   background: #95a5a6;
   cursor: not-allowed;
   opacity: 0.7;
+}
+
+/* Student Assessment Cards - Simple Design */
+.group-assessment-card {
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  border-radius: 8px;
+  background: #f8f9fa;
+  margin-bottom: 0.5rem;
+}
+
+.assessment-header {
+  margin-bottom: 0.5rem;
+}
+
+.assessment-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.due-date-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #7f8c8d;
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+}
+
+.due-date-info i {
+  color: #3498db;
+}
+
+.assessment-content {
+  margin-bottom: 0.5rem;
+}
+
+.assessment-content .assessment-description {
+  margin: 0;
+  color: #7f8c8d;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.assessment-footer {
+  margin-top: 0.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.assessment-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #7f8c8d;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.assessment-status i {
+  color: #27ae60;
+}
+
+.view-details-button {
+  background-color: #3498db;
+  color: white;
+  text-decoration: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: background-color 0.2s;
+}
+
+.view-details-button:hover {
+  background-color: #2980b9;
 }
 
 @media (max-width: 992px) {
