@@ -59,62 +59,110 @@
                             <div class="group-assessments">
                                 <div v-for="assessment in assessments"
                                      :key="assessment.id"
-                                     class="assessment-card"
+                                     :class="['teacher-assessment-card', { 'completed': activeTab === 'completed' || assessment.completedDate }]"
                                 >
-                                    <div class="assessment-header">
-                                        <h4>{{ assessment.title }}</h4>
-                                        <span class="due-date" v-if="activeTab === 'pending' && !assessment.completedDate">
-                                            Due: {{ formatDate(assessment.dueDate) }}
-                                        </span>
-                                        <div v-else-if="activeTab === 'pending' && assessment.completedDate" class="completion-info">
-                                            <span class="completion-date">
-                                                Completed: {{ formatDate(assessment.completedDate) }}
-                                            </span>
-                                            <span v-if="getCompletionStatus(assessment)"
-                                                  :class="['completion-status', getCompletionStatus(assessment).class]">
-                                                {{ getCompletionStatus(assessment).text }}
-                                            </span>
-                                        </div>
-                                        <div v-else class="completion-info">
-                                            <span class="completion-date">
-                                                Completed: {{ formatDate(assessment.completedDate) }}
-                                            </span>
-                                            <span v-if="getCompletionStatus(assessment)"
-                                                  :class="['completion-status', getCompletionStatus(assessment).class]">
-                                                {{ getCompletionStatus(assessment).text }}
-                                            </span>
-                                        </div>
-                                    </div>
+                                    <!-- Card status indicator -->
+                                    <div class="card-status-bar" :class="getCardStatusClass(assessment)"></div>
 
-                                    <div class="assessment-content">
-                                        <p>{{ assessment.description }}</p>
-                                        <div class="completion-stats" v-if="!isStudent">
-                                            <div class="stats-row">
-                                                <span>Responses:</span>
-                                                <span class="stat-value">
-                                                    {{ assessment.responsesCount }}/{{ assessment.studentsCount }}
+                                    <!-- Card header with title and status -->
+                                    <div class="card-header">
+                                        <div class="title-section">
+                                            <h4 class="assessment-title">{{ assessment.title }}</h4>
+                                            <div class="assessment-meta">
+                                                <span class="group-badge">
+                                                    <i class="fas fa-users"></i>
+                                                    {{ assessment.groupName }}
                                                 </span>
                                             </div>
-                                            <div class="progress-bar">
-                                                <div
-                                                    class="progress"
-                                                    :style="{ width: assessment.progress + '%' }"
-                                                ></div>
-                                            </div>
                                         </div>
-                                        <div class="completion-stats" v-else>
-                                            <div class="progress-bar">
-                                                <div class="progress" :style="{ width: assessment.progress + '%' }"></div>
+
+                                        <div class="status-section">
+                                            <!-- Due date or completion info -->
+                                            <div v-if="activeTab === 'pending' && !assessment.completedDate" class="date-info pending">
+                                                <i class="fas fa-clock"></i>
+                                                <div class="date-details">
+                                                    <span class="date-label">Due</span>
+                                                    <span class="date-value">{{ formatDate(assessment.dueDate) }}</span>
+                                                </div>
                                             </div>
-                                            <p class="progress-text">{{ assessment.progress }}% Complete</p>
+
+                                            <div v-else class="date-info completed">
+                                                <i class="fas fa-check-circle"></i>
+                                                <div class="date-details">
+                                                    <span class="date-label">Completed</span>
+                                                    <span class="date-value">{{ formatDate(assessment.completedDate) }}</span>
+                                                </div>
+                                            </div>
+
+                                            <!-- Completion status badge -->
+                                            <div v-if="getCompletionStatus(assessment)"
+                                                 :class="['status-badge', getCompletionStatus(assessment).class]">
+                                                <i class="fas fa-info-circle"></i>
+                                                {{ getCompletionStatus(assessment).text }}
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <div class="assessment-footer">
-                                        <button class="view-button" @click="viewResults(assessment.id)">
-                                            <i class="fas fa-chart-bar"></i>
-                                            View Results
-                                        </button>
+                                    <!-- Card content -->
+                                    <div class="card-content">
+                                        <p class="assessment-description">{{ assessment.description }}</p>
+
+                                        <!-- Progress and statistics -->
+                                        <div class="stats-section">
+                                            <div class="response-stats">
+                                                <div class="stat-item">
+                                                    <div class="stat-icon">
+                                                        <i class="fas fa-users"></i>
+                                                    </div>
+                                                    <div class="stat-details">
+                                                        <span class="stat-label">Responses</span>
+                                                        <span class="stat-value">{{ assessment.responsesCount }}/{{ assessment.studentsCount }}</span>
+                                                    </div>
+                                                </div>
+
+                                                <div class="stat-item">
+                                                    <div class="stat-icon">
+                                                        <i class="fas fa-percentage"></i>
+                                                    </div>
+                                                    <div class="stat-details">
+                                                        <span class="stat-label">Completion</span>
+                                                        <span class="stat-value">{{ Math.round((assessment.responsesCount / assessment.studentsCount) * 100) }}%</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Progress bar -->
+                                            <div class="progress-container">
+                                                <div class="progress-header">
+                                                    <span class="progress-label">Student Participation</span>
+                                                    <span class="progress-percentage">{{ Math.round((assessment.responsesCount / assessment.studentsCount) * 100) }}%</span>
+                                                </div>
+                                                <div class="progress-bar-modern">
+                                                    <div class="progress-fill"
+                                                         :style="{ width: Math.round((assessment.responsesCount / assessment.studentsCount) * 100) + '%' }"
+                                                         :class="getProgressClass(assessment)">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Card footer with actions -->
+                                    <div class="card-footer">
+                                        <div class="action-buttons">
+                                            <button class="action-btn primary" @click="viewResults(assessment.id)">
+                                                <i class="fas fa-chart-line"></i>
+                                                <span>View Results</span>
+                                            </button>
+                                        </div>
+
+                                        <!-- Quick stats -->
+                                        <div class="quick-stats">
+                                            <div class="quick-stat" v-if="assessment.feedbackCount">
+                                                <i class="fas fa-comments"></i>
+                                                <span>{{ assessment.feedbackCount }} feedback</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -817,6 +865,32 @@ const openCreateModal = () => {
     showCreateModal.value = true;
     console.log('Modal state after click:', showCreateModal.value);
 };
+
+// Helper functions for card styling
+const getCardStatusClass = (assessment) => {
+    if (activeTab.value === 'completed' || assessment.completedDate) {
+        return 'completed-status';
+    }
+
+    const now = new Date();
+    const due = new Date(assessment.dueDate);
+    const hoursRemaining = (due - now) / (1000 * 60 * 60);
+
+    if (hoursRemaining < 0) return 'overdue-status';
+    if (hoursRemaining < 24) return 'urgent-status';
+    if (hoursRemaining < 72) return 'warning-status';
+    return 'normal-status';
+};
+
+const getProgressClass = (assessment) => {
+    const percentage = Math.round((assessment.responsesCount / assessment.studentsCount) * 100);
+
+    if (percentage >= 100) return 'progress-complete';
+    if (percentage >= 75) return 'progress-high';
+    if (percentage >= 50) return 'progress-medium';
+    if (percentage >= 25) return 'progress-low';
+    return 'progress-none';
+};
 </script>
 
 <style scoped>
@@ -1431,324 +1505,559 @@ const openCreateModal = () => {
     color: #721c24;
 }
 
-/* Responsive adjustments for student cards */
-@media (max-width: 768px) {
-    .student-assessments-grid {
-        grid-template-columns: 1fr;
-        gap: 1rem;
-    }
-
-    .student-assessment-card {
-        padding: 1rem;
-    }
-
-    .results-section {
-        flex-direction: column;
-        gap: 0.75rem;
-    }
-
-    .due-info, .completion-info {
-        gap: 0.25rem;
-    }
-}
-
-/* Teacher Assessment Cards (Legacy) */
-.assessments-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 1.5rem;
-}
-
-.assessment-card {
-    background: white;
-    border-radius: 10px;
-    padding: 1.5rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    border: 1px solid #e1e1e1;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.assessment-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-}
-
-.assessment-header h4 {
-    margin: 0;
-    color: #2c3e50;
-    font-size: 1.1rem;
-}
-
-.due-date, .completion-date {
-    font-size: 0.9rem;
-    color: #666;
-}
-
-.teacher-assessments {
-    margin-top: 2rem;
-}
-
-.course-section {
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    margin-bottom: 2rem;
-    overflow: hidden;
-}
-
+/* Course and Group Headers */
 .course-header {
-    background-color: #f8f9fa;
-    padding: 1.5rem;
-    border-bottom: 1px solid #e1e1e1;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #e8ecf1;
 }
 
 .course-header h2 {
-    margin: 0;
     color: #2c3e50;
     font-size: 1.5rem;
-}
-
-.course-stats {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-}
-
-.group-count {
-    background-color: #e1e1e1;
-    padding: 0.4rem 0.8rem;
-    border-radius: 20px;
-    font-size: 0.9rem;
-    color: #666;
-}
-
-.groups-container {
-    padding: 1.5rem;
-}
-
-.group-section {
-    background-color: #fff;
-    border-radius: 8px;
-    border: 1px solid #e1e1e1;
-    margin-bottom: 1.5rem;
+    margin: 0;
+    font-weight: 600;
 }
 
 .group-header {
-    padding: 1rem 1.5rem;
-    border-bottom: 1px solid #e1e1e1;
-    background-color: #f8f9fa;
+    margin-bottom: 1rem;
 }
 
 .group-header h3 {
-    margin: 0;
     color: #34495e;
-    font-size: 1.2rem;
+    font-size: 1.1rem;
+    margin: 0;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
+.group-header h3::before {
+    content: "📁";
+    font-size: 0.9rem;
+}
+
+/* Teacher Assessment Cards Grid */
 .group-assessments {
-    padding: 1.5rem;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 1.5rem;
-}
-
-.completion-stats {
     margin-top: 1rem;
 }
 
-.stats-row {
+/* Modern Teacher Assessment Cards - Compact Design */
+.teacher-assessment-card {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fc 100%);
+    border-radius: 12px;
+    padding: 0;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06);
+    border: 1px solid #e8ecf1;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    height: 320px;
+    max-width: 280px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.teacher-assessment-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+    border-color: #3498db;
+}
+
+.teacher-assessment-card.completed {
+    background: linear-gradient(135deg, #f0f8f5 0%, #e8f5e8 100%);
+    border-color: #27ae60;
+}
+
+/* Card Status Bar */
+.card-status-bar {
+    height: 4px;
+    width: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    border-radius: 16px 16px 0 0;
+}
+
+.completed-status {
+    background: linear-gradient(90deg, #27ae60, #2ecc71);
+}
+
+.overdue-status {
+    background: linear-gradient(90deg, #e74c3c, #ec7063);
+}
+
+.urgent-status {
+    background: linear-gradient(90deg, #f39c12, #f7dc6f);
+}
+
+.warning-status {
+    background: linear-gradient(90deg, #f1c40f, #f4d03f);
+}
+
+.normal-status {
+    background: linear-gradient(90deg, #3498db, #5dade2);
+}
+
+/* Card Header */
+.card-header {
+    padding: 1rem 1rem 0.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-top: 4px; /* Account for status bar */
+}
+
+.title-section {
+    flex: 1;
+    min-width: 0; /* For text overflow */
+}
+
+.assessment-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #2c3e50;
+    margin: 0 0 0.5rem 0;
+    line-height: 1.2;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.assessment-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.group-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    background: linear-gradient(135deg, #3498db, #2980b9);
+    color: white;
+    padding: 0.25rem 0.6rem;
+    border-radius: 15px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    box-shadow: 0 2px 6px rgba(52, 152, 219, 0.25);
+}
+
+.group-badge i {
+    font-size: 0.7rem;
+}
+
+/* Status Section */
+.status-section {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.4rem;
+    min-width: 100px;
+}
+
+.date-info {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.7rem;
+    border-radius: 10px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    min-width: 0;
+}
+
+.date-info.pending {
+    background: linear-gradient(135deg, #fff3cd, #ffeeba);
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+.date-info.completed {
+    background: linear-gradient(135deg, #d4edda, #c3e6cb);
+    color: #155724;
+    border: 1px solid #b8daff;
+}
+
+.date-info i {
+    font-size: 0.9rem;
+    flex-shrink: 0;
+}
+
+.date-details {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    min-width: 0;
+}
+
+.date-label {
+    font-size: 0.65rem;
+    opacity: 0.8;
+    margin-bottom: 0.05rem;
+}
+
+.date-value {
+    font-weight: 600;
+    white-space: nowrap;
+    font-size: 0.75rem;
+}
+
+.status-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    text-align: center;
+}
+
+.status-badge.status-complete {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.status-badge.status-deadline {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+.status-badge.status-late {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+/* Card Content */
+.card-content {
+    padding: 0 1rem 1rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.assessment-description {
+    color: #5a6c7d;
+    line-height: 1.4;
+    margin-bottom: 1rem;
+    font-size: 0.85rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Stats Section */
+.stats-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.response-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 10px;
+    border: 1px solid #e8ecf1;
+    transition: all 0.2s ease;
+}
+
+.stat-item:hover {
+    background: rgba(255, 255, 255, 1);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.stat-icon {
+    width: 2rem;
+    height: 2rem;
+    background: linear-gradient(135deg, #3498db, #2980b9);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+}
+
+.stat-details {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.stat-label {
+    font-size: 0.7rem;
+    color: #7f8c8d;
+    margin-bottom: 0.1rem;
+}
+
+.stat-value {
+    font-weight: 700;
+    color: #2c3e50;
+    font-size: 0.9rem;
+}
+
+/* Progress Container */
+.progress-container {
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 10px;
+    padding: 0.75rem;
+    border: 1px solid #e8ecf1;
+}
+
+.progress-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 0.5rem;
-    color: #666;
-    font-size: 0.9rem;
 }
 
-.stat-value {
-    font-weight: 600;
+.progress-label {
+    font-size: 0.8rem;
+    color: #5a6c7d;
+    font-weight: 500;
+}
+
+.progress-percentage {
+    font-weight: 700;
     color: #2c3e50;
+    font-size: 0.85rem;
 }
 
-/* Form Actions */
-.form-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 1rem;
-    margin-top: 2rem;
-}
-
-.cancel-button {
-    padding: 0.75rem 1.5rem;
-    border: 1px solid #e74c3c;
-    background: white;
-    color: #e74c3c;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 500;
-    transition: all 0.2s ease;
-}
-
-.cancel-button:hover {
-    background: #e74c3c;
-    color: white;
-}
-
-.create-button {
-    padding: 0.75rem 1.5rem;
-    border: none;
-    background: #2ecc71;
-    color: white;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 500;
-    transition: all 0.2s ease;
-}
-
-.create-button:hover:not(:disabled) {
-    background: #27ae60;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.create-button:disabled {
-    background: #95a5a6;
-    cursor: not-allowed;
-    opacity: 0.7;
-}
-
-/* Criterion Buttons */
-.add-criterion-button {
-    width: 100%;
-    padding: 0.75rem;
-    background: #3498db;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    font-weight: 500;
-    transition: all 0.2s ease;
-    margin-top: 1rem;
-}
-
-.add-criterion-button:hover {
-    background: #2980b9;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.add-criterion-button i {
-    font-size: 0.9rem;
-}
-
-.criterion-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-}
-
-.criterion-header h4 {
-    margin: 0;
-    color: #2c3e50;
-    font-size: 1.1rem;
-}
-
-.remove-button {
-    background: none;
-    border: none;
-    color: #e74c3c;
-    font-size: 1.5rem;
-    cursor: pointer;
-    padding: 0.25rem 0.5rem;
-    line-height: 1;
+.progress-bar-modern {
+    height: 6px;
+    background: #ecf0f1;
     border-radius: 4px;
-    transition: all 0.2s ease;
+    overflow: hidden;
+    position: relative;
 }
 
-.remove-button:hover {
-    background: rgba(231, 76, 60, 0.1);
-    transform: scale(1.1);
-}
-
-.hint {
-    color: #7f8c8d;
-    font-size: 0.9rem;
-    margin-bottom: 1.5rem;
-    font-style: italic;
-}
-
-.assessment-footer {
-    margin-top: 1.5rem;
-    text-align: right;
-    display: flex;
-    justify-content: flex-end;
-    gap: 1rem;
-}
-
-.start-button, .view-button {
-    padding: 0.75rem 1.5rem;
-    border: none;
+.progress-fill {
+    height: 100%;
     border-radius: 6px;
-    cursor: pointer;
-    color: white;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    transition: all 0.2s ease;
-}
-
-.start-button {
-    background-color: #3498db;
-}
-
-.start-button:hover {
-    background-color: #2980b9;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.view-button {
-    background-color: #2c3e50;
+    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     overflow: hidden;
 }
 
-.view-button:hover {
-    background-color: #34495e;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+.progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, rgba(255,255,255,0.2) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.2) 75%, transparent 75%, transparent);
+    background-size: 20px 20px;
+    animation: progress-shimmer 2s linear infinite;
 }
 
-.view-button:before {
+@keyframes progress-shimmer {
+    0% { transform: translateX(-20px); }
+    100% { transform: translateX(20px); }
+}
+
+.progress-complete {
+    background: linear-gradient(90deg, #27ae60, #2ecc71);
+}
+
+.progress-high {
+    background: linear-gradient(90deg, #3498db, #5dade2);
+}
+
+.progress-medium {
+    background: linear-gradient(90deg, #f39c12, #f7dc6f);
+}
+
+.progress-low {
+    background: linear-gradient(90deg, #e67e22, #eb984e);
+}
+
+.progress-none {
+    background: linear-gradient(90deg, #e74c3c, #ec7063);
+}
+
+/* Card Footer */
+.card-footer {
+    padding: 0.75rem 1rem 1rem;
+    background: rgba(248, 249, 252, 0.5);
+    border-top: 1px solid #e8ecf1;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: auto;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.action-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.5rem 0.8rem;
+    border: none;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    text-decoration: none;
+    position: relative;
+    overflow: hidden;
+}
+
+.action-btn::before {
     content: '';
     position: absolute;
     top: 0;
     left: -100%;
     width: 100%;
     height: 100%;
-    background: linear-gradient(
-        120deg,
-        transparent,
-        rgba(255, 255, 255, 0.2),
-        transparent
-    );
-    transition: 0.5s;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: left 0.5s;
 }
 
-.view-button:hover:before {
+.action-btn:hover::before {
     left: 100%;
 }
 
-.view-button i, .start-button i {
-    font-size: 1rem;
+.action-btn.primary {
+    background: linear-gradient(135deg, #3498db, #2980b9);
+    color: white;
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+}
+
+.action-btn.primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+}
+
+.action-btn.secondary {
+    background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+    color: white;
+    box-shadow: 0 4px 12px rgba(149, 165, 166, 0.3);
+}
+
+.action-btn.secondary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(149, 165, 166, 0.4);
+}
+
+.action-btn i {
+    font-size: 0.7rem;
+}
+
+.quick-stats {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.quick-stat {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: #7f8c8d;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.quick-stat i {
+    color: #3498db;
+    font-size: 0.7rem;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .group-assessments {
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .teacher-assessment-card {
+        min-height: auto;
+        height: auto;
+        max-width: 100%;
+    }
+
+    .group-assessments {
+        grid-template-columns: 1fr;
+    }
+
+    .card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding: 1rem 1rem 0.75rem;
+    }
+
+    .status-section {
+        align-items: flex-start;
+        width: 100%;
+        flex-direction: row;
+        gap: 0.75rem;
+    }
+
+    .date-info {
+        align-self: flex-start;
+    }
+
+    .response-stats {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+
+    .action-buttons {
+        flex-direction: row;
+        width: 100%;
+        gap: 0.5rem;
+    }
+
+    .action-btn {
+        justify-content: center;
+        flex: 1;
+        font-size: 0.7rem;
+        padding: 0.4rem 0.6rem;
+    }
+
+    .card-footer {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+        padding: 0.75rem;
+    }
+
+    .quick-stats {
+        justify-content: center;
+    }
 }
 </style>
