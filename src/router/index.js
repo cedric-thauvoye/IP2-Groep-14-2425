@@ -23,6 +23,29 @@ const requireAuth = (to, from, next) => {
   }
 }
 
+// Teacher/Admin guard function
+const requireTeacherOrAdmin = async (to, from, next) => {
+  const token = localStorage.getItem('auth_token');
+  if (!token) {
+    next({ name: 'login' });
+    return;
+  }
+
+  try {
+    const response = await authService.checkUserRole();
+
+    if (response.data && (response.data.role === 'teacher' || response.data.role === 'admin')) {
+      next();
+    } else {
+      // Students are not allowed to access results
+      next({ name: 'home' });
+    }
+  } catch (error) {
+    console.error('Error checking user role for results access:', error);
+    next({ name: 'login' });
+  }
+}
+
 // Routes configuration
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -90,13 +113,13 @@ const router = createRouter({
       path: '/assessment/:id/results',
       name: 'assessment-results',
       component: ResultsDetailView,
-      beforeEnter: requireAuth
+      beforeEnter: requireTeacherOrAdmin
     },
     {
       path: '/results',
       name: 'results',
       component: ResultsView,
-      beforeEnter: requireAuth
+      beforeEnter: requireTeacherOrAdmin
     },
     {
       path: '/logout',

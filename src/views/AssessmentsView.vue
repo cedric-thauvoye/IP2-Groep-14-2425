@@ -206,33 +206,16 @@
 
                     <div class="student-assessment-content">
                         <p class="assessment-description">{{ assessment.description }}</p>
-                        <div class="results-section">
-                            <div class="result-item">
-                                <div class="result-icon">
-                                    <i class="fas fa-star"></i>
-                                </div>
-                                <div class="result-details">
-                                    <span class="result-label">Score</span>
-                                    <span class="result-value">{{ assessment.score || 'Pending' }}</span>
-                                </div>
-                            </div>
-                            <div class="result-item">
-                                <div class="result-icon">
-                                    <i class="fas fa-stopwatch"></i>
-                                </div>
-                                <div class="result-details">
-                                    <span class="result-label">Time Spent</span>
-                                    <span class="result-value">{{ assessment.timeSpent || 'N/A' }}</span>
-                                </div>
-                            </div>
-                        </div>
+                        <!-- Results section removed for students as they should not see scores or time spent -->
                     </div>
 
                     <div class="student-assessment-footer">
-                        <button class="results-button" @click="viewResults(assessment.id)">
-                            <i class="fas fa-chart-bar"></i>
-                            View Detailed Results
-                        </button>
+                        <div class="submission-summary">
+                            <div class="summary-item">
+                                <i class="fas fa-check-circle"></i>
+                                <span>Assessment Submitted Successfully</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1490,6 +1473,30 @@ const openCreateModal = () => {
 .results-button:hover {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(155, 89, 182, 0.3);
+}
+
+.submission-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1rem;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-radius: 8px;
+    border: 1px solid #e1e5e9;
+}
+
+.summary-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: #495057;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.summary-item i {
+    color: #28a745;
+    font-size: 1rem;
 }
 
 .overdue-notice {

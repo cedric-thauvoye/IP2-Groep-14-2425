@@ -120,15 +120,29 @@ app.get('/assessments/completed', authenticateToken, async (req, res) => {
     );
     conn.release();
 
-    const completedAssessments = rows.map(row => ({
-      id: row.id,
-      title: row.title,
-      courseName: row.courseName,
-      description: row.description,
-      completedDate: row.completed_date,
-      score: row.score,
-      timeSpent: row.time_spent || '0 min'
-    }));
+    const completedAssessments = rows.map(row => {
+      if (req.user.role === 'student') {
+        // Students should not see scores or time spent data
+        return {
+          id: row.id,
+          title: row.title,
+          courseName: row.courseName,
+          description: row.description,
+          completedDate: row.completed_date
+        };
+      } else {
+        // Teachers and admins can see all data
+        return {
+          id: row.id,
+          title: row.title,
+          courseName: row.courseName,
+          description: row.description,
+          completedDate: row.completed_date,
+          score: row.score,
+          timeSpent: row.time_spent || '0 min'
+        };
+      }
+    });
 
     res.json(completedAssessments);
   } catch (error) {
