@@ -323,9 +323,11 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
 import { userService, authService, courseService } from '../services/api';
+import { useBackNavigation } from '../composables/useBackNavigation';
 
 const router = useRouter();
 const route = useRoute();
+const { goBack } = useBackNavigation('/admin');
 const user = ref({});
 const loading = ref(true);
 const error = ref(null);
@@ -372,14 +374,6 @@ const formatDate = (dateString) => {
 
 const getInitials = (firstName, lastName) => {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
-};
-
-const goBack = () => {
-  if (window.history.length > 2) {
-    router.go(-1);
-  } else {
-    router.push('/admin');
-  }
 };
 
 // Initialize edit form with user data

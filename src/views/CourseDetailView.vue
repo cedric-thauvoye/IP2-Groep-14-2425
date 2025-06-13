@@ -9,8 +9,8 @@
       <div v-else-if="error" class="error-state">
         <i class="fas fa-exclamation-triangle"></i>
         <p>{{ error }}</p>
-        <button class="back-button" @click="router.push('/courses')">
-          Back to Courses
+        <button class="back-button" @click="goBack">
+          <i class="fas fa-arrow-left"></i> Back
         </button>
       </div>
 
@@ -18,8 +18,8 @@
         <!-- Header section -->
         <div class="header-section">
           <div class="back-nav">
-            <button class="back-button" @click="router.push('/courses')">
-              <i class="fas fa-arrow-left"></i> Back to Courses
+            <button class="back-button" @click="goBack">
+              <i class="fas fa-arrow-left"></i> Back
             </button>
           </div>
           <div class="title-section">
@@ -215,85 +215,15 @@
         </div>
 
         <!-- Add Student Modal -->
-        <div v-if="showAddStudentModal" class="modal-overlay">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h2>Add Students to Course</h2>
-              <button class="close-button" @click="showAddStudentModal = false">
-                <i class="fas fa-times"></i>
-              </button>
-            </div>
-            <div class="modal-body">
-              <div v-if="loadingStudents" class="loading-indicator">
-                <i class="fas fa-spinner fa-spin"></i>
-                <span>Loading students...</span>
-              </div>
-              <div v-else-if="filteredAvailableStudents.length === 0" class="no-students">
-                <p>No available students to add to this course.</p>
-              </div>
-              <div v-else>
-                <!-- Selected Students Section -->
-                <div v-if="selectedStudentIds.length > 0" class="selected-students-section">
-                  <label>Selected Students ({{ selectedStudentIds.length }})</label>
-                  <div class="selected-students">
-                    <div v-for="selectedId in selectedStudentIds" :key="selectedId" class="selected-student-chip">
-                      {{ getSelectedStudentName(selectedId) }}
-                      <button type="button" @click="removeSelectedStudent(selectedId)" class="remove-chip">
-                        <i class="fas fa-times"></i>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Student Selector -->
-                <div class="student-selector">
-                  <div class="search-box">
-                    <i class="fas fa-search"></i>
-                    <input
-                      type="text"
-                      v-model="availableStudentSearch"
-                      placeholder="Search students..."
-                      @input="filterAvailableStudents"
-                    >
-                  </div>
-
-                  <div class="students-select-list">
-                    <div
-                      v-for="student in filteredAvailableStudents"
-                      :key="student.id"
-                      class="student-select-item"
-                      @click="toggleStudentSelection(student.id)"
-                    >
-                      <div class="student-info">
-                        <div class="student-avatar">
-                          {{ getInitials(student.first_name, student.last_name) }}
-                        </div>
-                        <div class="student-details">
-                          <h3>{{ student.first_name }} {{ student.last_name }}</h3>
-                          <p class="student-email">{{ student.email }}</p>
-                          <p class="student-id">{{ student.q_number }}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="form-actions">
-                <button type="button" class="cancel-button" @click="cancelAddStudents">
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  class="save-button"
-                  @click="addSelectedStudents"
-                  :disabled="selectedStudentIds.length === 0"
-                >
-                  Add {{ selectedStudentIds.length }} Student{{ selectedStudentIds.length !== 1 ? 's' : '' }}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <!-- Add Student Modal -->
+        <AddStudentModal
+          v-model="showAddStudentModal"
+          title="Add Students to Course"
+          :available-students="availableStudents"
+          :loading="loadingStudents"
+          @confirm="addSelectedStudents"
+          @cancel="cancelAddStudents"
+        />
 
         <!-- Create Group Modal -->
         <div v-if="showCreateGroupModal" class="modal-overlay">
@@ -588,11 +518,14 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
+import AddStudentModal from '../components/Common/AddStudentModal.vue';
 import { courseService, authService, userService, groupService } from '../services/api';
 import { useNotificationStore } from '../stores/notificationStore';
+import { useBackNavigation } from '../composables/useBackNavigation';
 
 const router = useRouter();
 const route = useRoute();
+const { goBack } = useBackNavigation('/courses');
 const course = ref({});
 const filteredStudents = ref([]);
 const loading = ref(true);
@@ -609,11 +542,8 @@ const editingCourse = ref(null);
 const availableTeachers = ref([]);
 const loadingTeachers = ref(false);
 const teacherSearch = ref('');
-const availableStudentSearch = ref('');
-const allAvailableStudents = ref([]);
-const filteredAvailableStudents = ref([]);
+const availableStudents = ref([]);
 const loadingStudents = ref(false);
-const selectedStudentIds = ref([]);
 const newGroup = ref({ name: '', studentIds: [] });
 const groupStudentSearch = ref('');
 const isCreatingGroup = ref(false);
@@ -658,22 +588,6 @@ const filteredTeachers = computed(() => {
   });
 });
 
-// Filter available students based on search
-const filterAvailableStudents = () => {
-  const searchTerm = availableStudentSearch.value.toLowerCase();
-  if (!searchTerm) {
-    filteredAvailableStudents.value = allAvailableStudents.value;
-    return;
-  }
-
-  filteredAvailableStudents.value = allAvailableStudents.value.filter(student => {
-    return student.first_name.toLowerCase().includes(searchTerm) ||
-           student.last_name.toLowerCase().includes(searchTerm) ||
-           student.email.toLowerCase().includes(searchTerm) ||
-           (student.q_number && student.q_number.toLowerCase().includes(searchTerm));
-  });
-};
-
 // Filter course students for group creation
 const filteredCourseStudents = computed(() => {
   const searchTerm = groupStudentSearch.value.toLowerCase();
@@ -704,9 +618,7 @@ const fetchAvailableStudents = async () => {
   try {
     const response = await userService.getStudents();
     const currentStudentIds = course.value.students.map(s => s.id);
-    const availableStudents = response.data.filter(s => !currentStudentIds.includes(s.id));
-    allAvailableStudents.value = availableStudents;
-    filteredAvailableStudents.value = availableStudents;
+    availableStudents.value = response.data.filter(s => !currentStudentIds.includes(s.id));
   } catch (error) {
     console.error('Error fetching students:', error);
   } finally {
@@ -716,8 +628,6 @@ const fetchAvailableStudents = async () => {
 
 // Open the add student modal and load available students
 const openAddStudentModal = () => {
-  selectedStudentIds.value = [];
-  availableStudentSearch.value = '';
   showAddStudentModal.value = true;
   fetchAvailableStudents();
 };
@@ -826,50 +736,24 @@ const addStudentToCourse = async (studentId) => {
   }
 };
 
-// Enhanced student selection methods
-const toggleStudentSelection = (studentId) => {
-  const index = selectedStudentIds.value.indexOf(studentId);
-  if (index === -1) {
-    selectedStudentIds.value.push(studentId);
-  } else {
-    selectedStudentIds.value.splice(index, 1);
-  }
-};
-
-const removeSelectedStudent = (studentId) => {
-  const index = selectedStudentIds.value.indexOf(studentId);
-  if (index !== -1) {
-    selectedStudentIds.value.splice(index, 1);
-  }
-};
-
-const getSelectedStudentName = (studentId) => {
-  const student = allAvailableStudents.value.find(s => s.id === studentId);
-  return student ? `${student.first_name} ${student.last_name}` : '';
-};
-
 const cancelAddStudents = () => {
-  selectedStudentIds.value = [];
-  availableStudentSearch.value = '';
   showAddStudentModal.value = false;
 };
 
-const addSelectedStudents = async () => {
-  if (selectedStudentIds.value.length === 0) return;
+const addSelectedStudents = async (selectedStudents) => {
+  if (selectedStudents.length === 0) return;
 
   try {
     // Add all selected students to the course
-    const promises = selectedStudentIds.value.map(studentId =>
-      courseService.addStudentToCourse(course.value.id, studentId)
+    const promises = selectedStudents.map(student =>
+      courseService.addStudentToCourse(course.value.id, student.id)
     );
 
     await Promise.all(promises);
 
-    notificationStore.success(`${selectedStudentIds.value.length} student${selectedStudentIds.value.length !== 1 ? 's' : ''} added to course successfully.`);
+    notificationStore.success(`${selectedStudents.length} student${selectedStudents.length !== 1 ? 's' : ''} added to course successfully.`);
 
-    // Reset selection and close modal
-    selectedStudentIds.value = [];
-    availableStudentSearch.value = '';
+    // Close modal
     showAddStudentModal.value = false;
 
     // Refresh course data
