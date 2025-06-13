@@ -91,7 +91,7 @@
                                     </td>
                                     <td>{{ formatDate(result.date) }}</td>
                                     <td>
-                                        <button class="icon-button" @click="viewDetail(result.id)">
+                                        <button class="icon-button" @click="viewDetail(result)">
                                             <i class="fas fa-eye"></i>
                                         </button>
                                     </td>
@@ -240,8 +240,20 @@ const exportResults = () => {
     document.body.removeChild(link);
 };
 
-const viewDetail = (id) => {
-    router.push(`/assessment/${id}/results`);
+const viewDetail = (result) => {
+    // Build query parameters to filter by student
+    const query = {};
+    if (result.studentId) {
+        query.studentId = result.studentId;
+    }
+    if (result.studentName) {
+        query.studentName = result.studentName;
+    }
+
+    router.push({
+        path: `/assessment/${result.id}/results`,
+        query: query
+    });
 };
 
 // Helper function to get course ID by name

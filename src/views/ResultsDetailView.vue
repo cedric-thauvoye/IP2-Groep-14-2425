@@ -258,12 +258,11 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
+import { useRoute } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
 import { assessmentService, authService } from '../services/api';
 import { useBackNavigation } from '../composables/useBackNavigation';
 
-const router = useRouter();
 const route = useRoute();
 const { goBack } = useBackNavigation('/assessments');
 const assessmentId = route.params.id;
@@ -307,11 +306,27 @@ const fetchResults = async () => {
         const { data } = await assessmentService.getAssessmentResults(assessmentId);
         assessment.value = data;
 
+        // Check if there's a student filter from query parameters after results are loaded
+        checkAndSelectStudentFromQuery();
+
     } catch (err) {
         console.error('Error fetching results:', err);
         error.value = 'Failed to load assessment results. Please try again later.';
     } finally {
         loading.value = false;
+    }
+};
+
+// Check and select student from query parameters
+const checkAndSelectStudentFromQuery = () => {
+    const studentIdFromQuery = route.query.studentId;
+    if (studentIdFromQuery && !isStudent.value && assessment.value.results) {
+        const studentId = parseInt(studentIdFromQuery);
+        // Check if the student exists in the results
+        const studentExists = assessment.value.results.some(result => result.student.id === studentId);
+        if (studentExists) {
+            selectStudent(studentId);
+        }
     }
 };
 
