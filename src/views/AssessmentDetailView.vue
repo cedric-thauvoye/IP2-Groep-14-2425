@@ -138,9 +138,11 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
 import { assessmentService } from '../services/api';
+import { useBackNavigation } from '../composables/useBackNavigation';
 
 const router = useRouter();
 const route = useRoute();
+const { goBack } = useBackNavigation('/assessments');
 const assessmentId = route.params.id;
 
 const assessment = ref({
@@ -209,11 +211,6 @@ const isFormValid = computed(() => {
 
     return allCriteriaRated;
 });
-
-// Navigate back to the assessments list
-const goBack = () => {
-    router.push('/assessments');
-};
 
 // Fetch the assessment details
 const fetchAssessment = async () => {

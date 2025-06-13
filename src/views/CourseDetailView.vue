@@ -9,8 +9,8 @@
       <div v-else-if="error" class="error-state">
         <i class="fas fa-exclamation-triangle"></i>
         <p>{{ error }}</p>
-        <button class="back-button" @click="router.push('/courses')">
-          Back to Courses
+        <button class="back-button" @click="goBack">
+          <i class="fas fa-arrow-left"></i> Back
         </button>
       </div>
 
@@ -18,8 +18,8 @@
         <!-- Header section -->
         <div class="header-section">
           <div class="back-nav">
-            <button class="back-button" @click="router.push('/courses')">
-              <i class="fas fa-arrow-left"></i> Back to Courses
+            <button class="back-button" @click="goBack">
+              <i class="fas fa-arrow-left"></i> Back
             </button>
           </div>
           <div class="title-section">
@@ -521,9 +521,11 @@ import PageLayout from '../components/Layout/PageLayout.vue';
 import AddStudentModal from '../components/Common/AddStudentModal.vue';
 import { courseService, authService, userService, groupService } from '../services/api';
 import { useNotificationStore } from '../stores/notificationStore';
+import { useBackNavigation } from '../composables/useBackNavigation';
 
 const router = useRouter();
 const route = useRoute();
+const { goBack } = useBackNavigation('/courses');
 const course = ref({});
 const filteredStudents = ref([]);
 const loading = ref(true);
