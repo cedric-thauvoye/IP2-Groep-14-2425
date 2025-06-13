@@ -53,7 +53,7 @@
                             <span class="stat-label">Total Assessments</span>
                         </div>
                         <div class="stat-item">
-                            <span class="stat-value">{{ averageScore.toFixed(1) }}</span>
+                            <span class="stat-value">{{ averageScore.toFixed(1) }}%</span>
                             <span class="stat-label">Average Score</span>
                         </div>
                         <div class="stat-item">
@@ -86,7 +86,7 @@
                                     <td>{{ result.groupName }}</td>
                                     <td>
                                         <span class="score">
-                                            {{ formatScoreOnly(result.score) }}
+                                            {{ formatScoreOnly(result.score, result.maxScore) }}
                                         </span>
                                     </td>
                                     <td>{{ formatDate(result.date) }}</td>
@@ -129,12 +129,12 @@ const totalAssessments = computed(() => {
 const averageScore = computed(() => {
     if (results.value.length === 0) return 0;
 
-    const validScores = results.value
-        .filter(r => typeof r.score === 'number')
-        .map(r => r.score);
+    const validResults = results.value.filter(r => typeof r.score === 'number' && r.maxScore);
 
-    if (validScores.length === 0) return 0;
-    return validScores.reduce((a, b) => a + b, 0) / validScores.length;
+    if (validResults.length === 0) return 0;
+
+    const percentages = validResults.map(r => (r.score / r.maxScore) * 100);
+    return percentages.reduce((a, b) => a + b, 0) / percentages.length;
 });
 
 const completionRate = computed(() => {
@@ -184,11 +184,12 @@ const formatDate = (date) => {
     }
 };
 
-const formatScoreOnly = (score) => {
+const formatScoreOnly = (score, maxScore = 20) => {
     if (score === 'N/A' || score === 'Pending' || typeof score !== 'number') {
         return score;
     }
-    return score.toFixed(1);
+    const percentage = (score / maxScore) * 100;
+    return `${percentage.toFixed(1)}%`;
 };
 
 const loadGroups = async () => {
@@ -225,7 +226,7 @@ const exportResults = () => {
             escapeField(result.assessmentTitle),
             escapeField(result.courseName),
             escapeField(result.groupName),
-            result.score === 'N/A' || result.score === 'Pending' ? result.score : result.score.toFixed(1),
+            result.score === 'N/A' || result.score === 'Pending' ? result.score : formatScoreOnly(result.score, result.maxScore),
             formatDate(result.date)
         ].join(','))
     ].join('\n');
