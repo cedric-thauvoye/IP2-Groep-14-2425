@@ -800,6 +800,11 @@ module.exports = (pool) => {
 
       conn.release();
 
+      // Calculate the average maxScore from criteria
+      const avgMaxScore = criteria.length > 0
+        ? criteria.reduce((sum, c) => sum + parseFloat(c.max_score), 0) / criteria.length
+        : 5.0;
+
       res.json({
         id: assessment.id,
         title: assessment.title,
@@ -807,6 +812,7 @@ module.exports = (pool) => {
         groupName: assessment.groupName,
         description: assessment.description,
         dueDate: assessment.due_date,
+        maxScore: avgMaxScore,
         criteria: criteria,
         results: results
       });
