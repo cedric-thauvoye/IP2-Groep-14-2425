@@ -412,7 +412,10 @@ const newAssessment = ref({
 // Format date function
 const formatDate = (dateString) => {
   if (!dateString) return 'No date set';
+
   const date = new Date(dateString);
+  if (isNaN(date.getTime())) return 'Invalid Date';
+
   return date.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'short',
