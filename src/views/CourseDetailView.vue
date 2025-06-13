@@ -962,12 +962,15 @@ onMounted(async () => {
 
 .edit-button, .delete-button {
   border: none;
-  padding: 0.75rem 1.5rem;
+  padding: 0.875rem 1.5rem;
   border-radius: 8px;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
 }
 
 .edit-button {
@@ -975,9 +978,21 @@ onMounted(async () => {
   color: white;
 }
 
+.edit-button:hover {
+  background-color: #e67e22;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(243, 156, 18, 0.3);
+}
+
 .delete-button {
   background-color: #e74c3c;
   color: white;
+}
+
+.delete-button:hover {
+  background-color: #c0392b;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
 }
 
 .description-card, .content-card {
