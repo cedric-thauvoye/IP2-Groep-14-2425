@@ -207,7 +207,7 @@
 
       <!-- Edit Course Modal -->
       <div v-if="showEditCourseModal && editingCourse" class="modal-overlay">
-        <div class="modal-content">
+        <div class="modal-content edit-course-modal">
           <div class="modal-header">
             <h2>Edit Course</h2>
             <button class="close-button" @click="showEditCourseModal = false">
@@ -216,23 +216,29 @@
           </div>
           <div class="modal-body">
             <form @submit.prevent="saveEditedCourse">
-              <div class="form-group">
-                <label for="course-name">Course Name</label>
-                <input
-                  type="text"
-                  id="course-name"
-                  v-model="editingCourse.name"
-                  required
-                >
-              </div>
-              <div class="form-group">
-                <label for="course-code">Course Code</label>
-                <input
-                  type="text"
-                  id="course-code"
-                  v-model="editingCourse.code"
-                  required
-                >
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="course-name">Course Name*</label>
+                  <input
+                    type="text"
+                    id="course-name"
+                    v-model="editingCourse.name"
+                    required
+                    placeholder="Enter course name"
+                    class="form-input"
+                  >
+                </div>
+                <div class="form-group">
+                  <label for="course-code">Course Code*</label>
+                  <input
+                    type="text"
+                    id="course-code"
+                    v-model="editingCourse.code"
+                    required
+                    placeholder="Enter course code"
+                    class="form-input"
+                  >
+                </div>
               </div>
               <div class="form-group">
                 <label for="course-description">Description</label>
@@ -240,6 +246,8 @@
                   id="course-description"
                   v-model="editingCourse.description"
                   rows="4"
+                  placeholder="Describe the course content and objectives"
+                  class="form-textarea"
                 ></textarea>
               </div>
               <div class="form-actions">
@@ -247,7 +255,7 @@
                   Cancel
                 </button>
                 <button type="submit" class="save-button">
-                  Save Changes
+                  <i class="fas fa-save"></i> Save Changes
                 </button>
               </div>
             </form>
@@ -745,6 +753,16 @@ onMounted(async () => {
   padding: 2rem;
 }
 
+/* Enhanced Edit Course Modal */
+.edit-course-modal {
+  width: 600px;
+  max-width: 95%;
+}
+
+.edit-course-modal .modal-body {
+  padding: 2rem;
+}
+
 /* Form Layout Improvements */
 .form-row {
   display: grid;
@@ -973,12 +991,14 @@ onMounted(async () => {
 
 /* Mobile Responsive */
 @media (max-width: 768px) {
-  .create-course-modal {
+  .create-course-modal,
+  .edit-course-modal {
     width: 95%;
     margin: 1rem;
   }
 
-  .create-course-modal .modal-body {
+  .create-course-modal .modal-body,
+  .edit-course-modal .modal-body {
     padding: 1.5rem;
   }
 
