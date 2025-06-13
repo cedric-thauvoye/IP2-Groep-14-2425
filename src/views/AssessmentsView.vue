@@ -27,6 +27,25 @@
                 </button>
             </div>
 
+            <!-- Course Filter (only for teachers) -->
+            <div v-if="isTeacher" class="course-filter">
+                <div class="filter-group">
+                    <label for="courseFilter">
+                        <i class="fas fa-filter"></i>
+                        Filter by Course:
+                    </label>
+                    <select id="courseFilter" v-model="selectedCourseFilter" class="course-filter-select">
+                        <option value="">All Courses</option>
+                        <option v-for="course in availableCourses" :key="course" :value="course">
+                            {{ course }}
+                        </option>
+                    </select>
+                    <span class="filter-count" v-if="selectedCourseFilter">
+                        ({{ filteredAssessmentsCount }} assessment{{ filteredAssessmentsCount !== 1 ? 's' : '' }} shown)
+                    </span>
+                </div>
+            </div>
+
             <div v-if="loading" class="loading-state">
                 <i class="fas fa-spinner fa-spin"></i>
                 <p>Loading assessments...</p>
@@ -452,6 +471,7 @@ const showCreateModal = ref(false);
 const courses = ref([]);
 const groups = ref([]);
 const isSubmitting = ref(false);
+const selectedCourseFilter = ref('');
 
 const newAssessment = ref({
     title: '',
@@ -627,15 +647,6 @@ const viewResults = (id) => {
     router.push(`/assessment/${id}/results`);
 };
 
-const loadCourses = async () => {
-    try {
-        const { data } = await courseService.getCourses(true); // Get courses where user is teaching
-        courses.value = data;
-    } catch (error) {
-        console.error('Error loading courses:', error);
-    }
-};
-
 const loadGroups = async () => {
     try {
         if (!newAssessment.value.courseId) return;
@@ -715,10 +726,6 @@ const toggleAllGroups = () => {
     }
 };
 
-const isStudent = computed(() => {
-    return !isTeacher.value;
-});
-
 // Add new computed properties for organizing assessments
 const organizedAssessments = computed(() => {
     if (!isTeacher.value) return {};
@@ -728,7 +735,9 @@ const organizedAssessments = computed(() => {
 
     // Process pending assessments
     if (activeTab.value === 'pending') {
-        pendingAssessments.value.forEach(assessment => {
+        pendingAssessments.value
+            .filter(assessment => !selectedCourseFilter.value || assessment.courseName === selectedCourseFilter.value)
+            .forEach(assessment => {
             if (!organized[assessment.courseName]) {
                 organized[assessment.courseName] = {
                     groups: {},
@@ -754,7 +763,9 @@ const organizedAssessments = computed(() => {
         });
     } else {
         // Process completed assessments
-        completedAssessments.value.forEach(assessment => {
+        completedAssessments.value
+            .filter(assessment => !selectedCourseFilter.value || assessment.courseName === selectedCourseFilter.value)
+            .forEach(assessment => {
             if (!organized[assessment.courseName]) {
                 organized[assessment.courseName] = {
                     groups: {},
@@ -781,6 +792,20 @@ const organizedAssessments = computed(() => {
     }
 
     return organized;
+});
+
+// Computed property for available courses based on teacher's courses
+const availableCourses = computed(() => {
+    if (!isTeacher.value) return [];
+    return courses.value.map(course => course.name);
+});
+
+// Computed property for filtered assessments count
+const filteredAssessmentsCount = computed(() => {
+    if (!selectedCourseFilter.value) return 0;
+
+    const assessments = activeTab.value === 'pending' ? pendingAssessments.value : completedAssessments.value;
+    return assessments.filter(assessment => assessment.courseName === selectedCourseFilter.value).length;
 });
 
 // Update the onMounted hook
@@ -1243,6 +1268,58 @@ const getProgressClass = (assessment) => {
     font-size: 0.8rem;
 }
 
+/* Course Filter Styles */
+.course-filter {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.filter-group label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    color: #495057;
+    margin: 0;
+}
+
+.filter-group label i {
+    color: #6c757d;
+}
+
+.course-filter-select {
+    padding: 0.5rem 1rem;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    background: white;
+    font-size: 0.9rem;
+    color: #495057;
+    min-width: 200px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.course-filter-select:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.filter-count {
+    color: #6c757d;
+    font-size: 0.85rem;
+    font-style: italic;
+}
+
 .loading-state, .empty-state {
     display: flex;
     flex-direction: column;
@@ -1265,6 +1342,7 @@ const getProgressClass = (assessment) => {
     font-size: 0.9rem;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
@@ -1377,6 +1455,7 @@ const getProgressClass = (assessment) => {
     font-size: 0.9rem;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
@@ -1903,6 +1982,7 @@ const getProgressClass = (assessment) => {
     line-height: 1.3;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
@@ -2029,6 +2109,7 @@ const getProgressClass = (assessment) => {
     font-size: 0.9rem;
     display: -webkit-box;
     -webkit-line-clamp: 2;
+    line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
