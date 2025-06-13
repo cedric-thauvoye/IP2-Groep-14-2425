@@ -83,7 +83,15 @@
                                     <td>{{ result.studentName }}</td>
                                     <td>{{ result.assessmentTitle }}</td>
                                     <td>{{ result.courseName }}</td>
-                                    <td>{{ result.groupName }}</td>
+                                    <td>
+                                        <span
+                                            class="clickable-group"
+                                            @click="viewGroupResults(result)"
+                                            :title="`View results for ${result.groupName}`"
+                                        >
+                                            {{ result.groupName }}
+                                        </span>
+                                    </td>
                                     <td>
                                         <span class="score">
                                             {{ formatScoreOnly(result.score, result.maxScore) }}
@@ -248,6 +256,22 @@ const viewDetail = (result) => {
     }
     if (result.studentName) {
         query.studentName = result.studentName;
+    }
+
+    router.push({
+        path: `/assessment/${result.id}/results`,
+        query: query
+    });
+};
+
+const viewGroupResults = (result) => {
+    // Navigate to results detail page filtered by group
+    const query = {};
+    if (result.groupId) {
+        query.groupId = result.groupId;
+    }
+    if (result.groupName) {
+        query.groupName = result.groupName;
     }
 
     router.push({
@@ -496,6 +520,22 @@ td {
 
 .icon-button:hover {
     background-color: #f8f9fa;
+}
+
+.clickable-group {
+    color: #3498db;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    display: inline-block;
+}
+
+.clickable-group:hover {
+    background-color: #f0f8ff;
+    text-decoration: underline;
+    color: #2980b9;
 }
 
 .action-button {

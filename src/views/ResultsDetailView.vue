@@ -309,6 +309,9 @@ const fetchResults = async () => {
         // Check if there's a student filter from query parameters after results are loaded
         checkAndSelectStudentFromQuery();
 
+        // Check and handle group filtering from query parameters
+        checkAndHandleGroupFiltering();
+
     } catch (err) {
         console.error('Error fetching results:', err);
         error.value = 'Failed to load assessment results. Please try again later.';
@@ -327,6 +330,19 @@ const checkAndSelectStudentFromQuery = () => {
         if (studentExists) {
             selectStudent(studentId);
         }
+    }
+};
+
+// Check and handle group filtering from query parameters
+const checkAndHandleGroupFiltering = () => {
+    const groupIdFromQuery = route.query.groupId;
+    const groupNameFromQuery = route.query.groupName;
+
+    if (groupIdFromQuery || groupNameFromQuery) {
+        console.log('Group filter applied:', { groupId: groupIdFromQuery, groupName: groupNameFromQuery });
+
+        // You could implement group-specific filtering here if needed
+        // For example, filter students by group membership
     }
 };
 
