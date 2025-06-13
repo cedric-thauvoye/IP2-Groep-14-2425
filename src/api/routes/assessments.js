@@ -165,9 +165,8 @@ module.exports = (pool) => {
             courseName: row.courseName,
             groupName: row.groupName,
             description: row.description,
-            completedDate: row.completedDate,
-            score: row.score ? parseFloat(row.score).toFixed(1) : 'N/A',
-            timeSpent: '30 min' // This could be calculated if you track time spent
+            completedDate: row.completedDate
+            // Removed score and timeSpent as students should not see this data
           };
         } else {
           // Calculate completion percentage for teachers
@@ -590,16 +589,9 @@ module.exports = (pool) => {
 
       const assessment = assessmentRows[0];
 
-      // Check permissions
+      // Check permissions - only teachers and admins can view results
       let permissionCheck;
-      if (req.user.role === 'student') {
-        // Students must be in the group
-        [permissionCheck] = await conn.execute(
-          `SELECT 1 FROM group_students
-           WHERE group_id = ? AND student_id = ?`,
-          [assessment.group_id, req.user.id]
-        );
-      } else if (req.user.role === 'teacher') {
+      if (req.user.role === 'teacher') {
         // Teachers must teach the course of this assessment
         [permissionCheck] = await conn.execute(
           `SELECT 1 FROM course_teachers ct
@@ -610,6 +602,10 @@ module.exports = (pool) => {
       } else if (req.user.role === 'admin') {
         // Admins can view any results
         permissionCheck = [1];
+      } else {
+        // Students are not allowed to view results
+        conn.release();
+        return res.status(403).json({ message: 'Students are not authorized to view assessment results' });
       }
 
       if (!permissionCheck || permissionCheck.length === 0) {
@@ -628,74 +624,18 @@ module.exports = (pool) => {
       // Different data based on role
       let results;
 
-      if (req.user.role === 'student') {
-        // Students see their own results
-        const [studentResults] = await conn.execute(
-          `SELECT
-             ac.id as criteria_id,
-             ac.name as criteria_name,
-             ac.max_score,
-             AVG(r.given_score) as average_score,
-             COUNT(r.id) as number_of_ratings
-           FROM assessment_criteria ac
-           LEFT JOIN results r ON ac.id = r.criteria_id AND r.student_id = ?
-           LEFT JOIN responses resp ON r.response_id = resp.id AND resp.assessment_id = ?
-           WHERE ac.assessment_id = ?
-           GROUP BY ac.id, ac.name, ac.max_score`,
-          [req.user.id, id, id]
-        );
+      // Helper function to get color based on score percentage
+      const getScoreColor = (score, maxScore) => {
+        if (!score || !maxScore) return 'neutral';
+        const percentage = (score / maxScore) * 100;
+        if (percentage >= 80) return 'excellent';
+        if (percentage >= 70) return 'good';
+        if (percentage >= 60) return 'average';
+        if (percentage >= 50) return 'below-average';
+        return 'poor';
+      };
 
-        // Get overall average and total max score
-        const [overallAvg] = await conn.execute(
-          `SELECT
-             AVG(r.given_score) as overall_average,
-             AVG(ac.max_score) as max_average
-           FROM results r
-           JOIN responses resp ON r.response_id = resp.id
-           JOIN assessment_criteria ac ON r.criteria_id = ac.id
-           WHERE resp.assessment_id = ? AND r.student_id = ?`,
-          [id, req.user.id]
-        );
-
-        // Helper function to get color based on score percentage
-        const getScoreColor = (score, maxScore) => {
-          if (!score || !maxScore) return 'neutral';
-          const percentage = (score / maxScore) * 100;
-          if (percentage >= 80) return 'excellent';
-          if (percentage >= 70) return 'good';
-          if (percentage >= 60) return 'average';
-          if (percentage >= 50) return 'below-average';
-          return 'poor';
-        };
-
-        results = {
-          criteria: studentResults.map(criteria => ({
-            ...criteria,
-            average_score: criteria.average_score ? parseFloat(criteria.average_score).toFixed(1) : 'N/A',
-            score_display: criteria.average_score ?
-              `${parseFloat(criteria.average_score).toFixed(1)}/${criteria.max_score}` :
-              `N/A/${criteria.max_score}`,
-            score_color: getScoreColor(criteria.average_score, criteria.max_score)
-          })),
-          overallAverage: overallAvg[0].overall_average ? parseFloat(overallAvg[0].overall_average).toFixed(1) : 'N/A',
-          overallAverageDisplay: overallAvg[0].overall_average && overallAvg[0].max_average ?
-            `${parseFloat(overallAvg[0].overall_average).toFixed(1)}/${parseFloat(overallAvg[0].max_average).toFixed(1)}` :
-            'N/A',
-          overallScoreColor: getScoreColor(overallAvg[0].overall_average, overallAvg[0].max_average)
-        };
-      } else {
-        // Helper function to get color based on score percentage
-        const getScoreColor = (score, maxScore) => {
-          if (!score || !maxScore) return 'neutral';
-          const percentage = (score / maxScore) * 100;
-          if (percentage >= 80) return 'excellent';
-          if (percentage >= 70) return 'good';
-          if (percentage >= 60) return 'average';
-          if (percentage >= 50) return 'below-average';
-          return 'poor';
-        };
-
-        // Teachers see results for all students in the group
+      // Teachers and admins see results for all students in the group
         const [studentList] = await conn.execute(
           `SELECT u.id, u.first_name, u.last_name, u.q_number
            FROM users u
@@ -796,7 +736,6 @@ module.exports = (pool) => {
         }
 
         results = studentResults;
-      }
 
       conn.release();
 
