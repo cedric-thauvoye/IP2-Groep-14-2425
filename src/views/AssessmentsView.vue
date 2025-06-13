@@ -80,12 +80,6 @@
                                                     {{ assessment.responsesCount }}/{{ assessment.studentsCount }}
                                                 </span>
                                             </div>
-                                            <div class="stats-row">
-                                                <span>With Feedback:</span>
-                                                <span class="stat-value">
-                                                    {{ assessment.feedbackCount }}/{{ assessment.studentsCount }}
-                                                </span>
-                                            </div>
                                             <div class="progress-bar">
                                                 <div
                                                     class="progress"
