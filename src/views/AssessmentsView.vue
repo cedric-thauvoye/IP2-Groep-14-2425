@@ -210,15 +210,6 @@
 
                     <div class="student-assessment-content">
                         <p class="assessment-description">{{ assessment.description }}</p>
-                        <div class="progress-section">
-                            <div class="progress-bar-container">
-                                <div class="progress-bar">
-                                    <div class="progress-fill" :style="{ width: assessment.progress + '%' }"></div>
-                                </div>
-                                <span class="progress-percentage">{{ assessment.progress }}%</span>
-                            </div>
-                            <p class="progress-label">Progress</p>
-                        </div>
                     </div>
 
                     <div class="student-assessment-footer">
@@ -269,33 +260,6 @@
 
                     <div class="student-assessment-content">
                         <p class="assessment-description">{{ assessment.description }}</p>
-                        <div class="results-section">
-                            <div class="result-item">
-                                <div class="result-icon">
-                                    <i class="fas fa-star"></i>
-                                </div>
-                                <div class="result-details">
-                                    <span class="result-label">Score</span>
-                                    <span class="result-value">{{ assessment.score || 'Pending' }}</span>
-                                </div>
-                            </div>
-                            <div class="result-item">
-                                <div class="result-icon">
-                                    <i class="fas fa-stopwatch"></i>
-                                </div>
-                                <div class="result-details">
-                                    <span class="result-label">Time Spent</span>
-                                    <span class="result-value">{{ assessment.timeSpent || 'N/A' }}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="student-assessment-footer">
-                        <button class="results-button" @click="viewResults(assessment.id)">
-                            <i class="fas fa-chart-bar"></i>
-                            View Detailed Results
-                        </button>
                     </div>
                 </div>
             </div>
@@ -1293,6 +1257,74 @@ const getProgressClass = (assessment) => {
     margin-bottom: 1rem;
 }
 
+/* Teacher Card Specific Styles for Shared Classes */
+.teacher-assessment-card .assessment-description {
+    color: #6c757d;
+    line-height: 1.5;
+    margin: 0 0 1rem 0;
+    font-size: 0.9rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.teacher-assessment-card .progress-bar-modern {
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+}
+
+.teacher-assessment-card .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #007bff, #0056b3);
+    border-radius: 6px;
+    transition: width 0.4s ease;
+}
+
+/* Teacher View Layout - Course and Group Headers */
+.course-header {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #e8ecf1;
+}
+
+.course-header h2 {
+    color: #2c3e50;
+    font-size: 1.5rem;
+    margin: 0;
+    font-weight: 600;
+}
+
+.group-header {
+    margin-bottom: 1rem;
+}
+
+.group-header h3 {
+    color: #34495e;
+    font-size: 1.1rem;
+    margin: 0;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.group-header h3::before {
+    content: "📁";
+    font-size: 0.9rem;
+}
+
+/* Teacher Assessment Cards Grid */
+.group-assessments {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
 /* Student Assessments Specific Styles */
 .student-assessments-grid {
     display: grid;
@@ -1337,6 +1369,18 @@ const getProgressClass = (assessment) => {
     border-left: 4px solid #3498db;
 }
 
+/* Student Assessment Content */
+.student-assessment-card .assessment-description {
+    color: #6c757d;
+    line-height: 1.5;
+    margin: 0 0 1rem 0;
+    font-size: 0.9rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
 .assessment-urgency-indicator {
     position: absolute;
     top: 0;
@@ -1344,56 +1388,67 @@ const getProgressClass = (assessment) => {
     width: 0;
     height: 0;
     border-style: solid;
+    z-index: 2;
 }
 
-.overdue-indicator {
-    border-width: 0 30px 30px 0;
+.student-assessment-card .overdue-indicator {
+    border-width: 0 35px 35px 0;
     border-color: transparent #e74c3c transparent transparent;
+    filter: drop-shadow(0 2px 4px rgba(231, 76, 60, 0.3));
 }
 
-.urgent-indicator {
-    border-width: 0 25px 25px 0;
+.student-assessment-card .urgent-indicator {
+    border-width: 0 30px 30px 0;
     border-color: transparent #f39c12 transparent transparent;
+    filter: drop-shadow(0 2px 4px rgba(243, 156, 18, 0.3));
 }
 
-.warning-indicator {
-    border-width: 0 20px 20px 0;
+.student-assessment-card .warning-indicator {
+    border-width: 0 25px 25px 0;
     border-color: transparent #f1c40f transparent transparent;
+    filter: drop-shadow(0 2px 4px rgba(241, 196, 15, 0.3));
 }
 
-.normal-indicator {
-    border-width: 0 15px 15px 0;
+.student-assessment-card .normal-indicator {
+    border-width: 0 20px 20px 0;
     border-color: transparent #27ae60 transparent transparent;
+    filter: drop-shadow(0 2px 4px rgba(39, 174, 96, 0.3));
 }
 
-.assessment-status-badge {
+.student-assessment-card .assessment-status-badge {
     position: absolute;
-    top: 0.6rem;
-    right: 0.6rem;
-    background: #e74c3c;
+    top: 0.75rem;
+    right: 0.75rem;
+    background: linear-gradient(135deg, #e74c3c, #c0392b);
     color: white;
-    padding: 0.2rem 0.6rem;
-    border-radius: 15px;
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
     font-size: 0.75rem;
     font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.3rem;
+    box-shadow: 0 3px 12px rgba(231, 76, 60, 0.3);
+    z-index: 3;
+    border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.completion-badge {
+.student-assessment-card .completion-badge {
     position: absolute;
-    top: 0.6rem;
-    right: 0.6rem;
-    background: #27ae60;
+    top: 0.75rem;
+    right: 0.75rem;
+    background: linear-gradient(135deg, #27ae60, #229954);
     color: white;
-    padding: 0.2rem 0.6rem;
-    border-radius: 15px;
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
     font-size: 0.75rem;
     font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.3rem;
+    box-shadow: 0 3px 12px rgba(39, 174, 96, 0.3);
+    z-index: 3;
+    border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .student-assessment-header {
@@ -1422,42 +1477,44 @@ const getProgressClass = (assessment) => {
     font-weight: 500;
 }
 
-.due-date-display.overdue {
+.student-assessment-card .due-date-display.overdue {
     color: #e74c3c;
 }
 
-.due-date-display.urgent {
+.student-assessment-card .due-date-display.urgent {
     color: #f39c12;
 }
 
-.due-date-display.warning {
+.student-assessment-card .due-date-display.warning {
     color: #e67e22;
 }
 
-.due-date-display.normal {
+.student-assessment-card .due-date-display.normal {
     color: #27ae60;
 }
 
-.completion-date-display {
+.student-assessment-card .completion-date-display {
     color: #3498db;
 }
 
-.due-label, .completion-label {
+.student-assessment-card .due-label,
+.student-assessment-card .completion-label {
     font-weight: 400;
     color: #6c757d;
 }
 
-.due-date-time, .completion-date-time {
+.student-assessment-card .due-date-time,
+.student-assessment-card .completion-date-time {
     font-weight: 600;
 }
 
-.time-remaining {
+.student-assessment-card .time-remaining {
     font-size: 0.75rem;
     color: #7f8c8d;
     font-style: italic;
 }
 
-.submission-status {
+.student-assessment-card .submission-status {
     font-size: 0.8rem;
     padding: 0.2rem 0.5rem;
     border-radius: 12px;
@@ -1465,24 +1522,24 @@ const getProgressClass = (assessment) => {
     align-self: flex-start;
 }
 
-.submission-status.on-time {
+.student-assessment-card .submission-status.on-time {
     background: #d4edda;
     color: #155724;
 }
 
-.submission-status.late-submission {
+.student-assessment-card .submission-status.late-submission {
     background: #f8d7da;
     color: #721c24;
 }
 
-/* Completion status styles */
-.completion-info {
+/* Student Completion status styles */
+.student-assessment-card .completion-info {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
 }
 
-.completion-status {
+.student-assessment-card .completion-status {
     font-size: 0.8rem;
     padding: 0.2rem 0.5rem;
     border-radius: 12px;
@@ -1490,141 +1547,360 @@ const getProgressClass = (assessment) => {
     text-align: center;
 }
 
-.status-complete {
+.student-assessment-card .status-complete {
     background: #d4edda;
     color: #155724;
 }
 
-.status-deadline {
+.student-assessment-card .status-deadline {
     background: #fff3cd;
     color: #856404;
 }
 
-.status-late {
+.student-assessment-card .status-late {
     background: #f8d7da;
     color: #721c24;
 }
 
-/* Course and Group Headers */
-.course-header {
-    margin-bottom: 1.5rem;
-    padding-bottom: 1rem;
-    border-bottom: 2px solid #e8ecf1;
-}
-
-.course-header h2 {
-    color: #2c3e50;
-    font-size: 1.5rem;
-    margin: 0;
-    font-weight: 600;
-}
-
-.group-header {
-    margin-bottom: 1rem;
-}
-
-.group-header h3 {
-    color: #34495e;
-    font-size: 1.1rem;
-    margin: 0;
-    font-weight: 500;
+/* Student Assessment Card Content Styles */
+.student-assessment-card .course-info {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    margin-bottom: 1rem;
+    padding: 0.5rem 0.75rem;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-radius: 8px;
+    border-left: 3px solid #007bff;
 }
 
-.group-header h3::before {
-    content: "📁";
+.student-assessment-card .course-info i {
+    color: #007bff;
     font-size: 0.9rem;
 }
 
-/* Teacher Assessment Cards Grid */
-.group-assessments {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 1.5rem;
-    margin-top: 1rem;
+.student-assessment-card .course-info span {
+    color: #495057;
+    font-weight: 500;
+    font-size: 0.9rem;
 }
 
-/* Modern Teacher Assessment Cards - Compact Design */
-.teacher-assessment-card {
-    background: linear-gradient(135deg, #ffffff 0%, #f8f9fc 100%);
-    border-radius: 12px;
-    padding: 0;
-    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06);
-    border: 1px solid #e8ecf1;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+.student-assessment-card .student-assessment-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.student-assessment-card .progress-section {
+    background: linear-gradient(135deg, #f8f9fc, #e8ecf1);
+    border-radius: 10px;
+    padding: 1rem;
+    border: 1px solid #e1e8f0;
+}
+
+.student-assessment-card .progress-bar-container {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.student-assessment-card .progress-bar {
+    flex: 1;
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+}
+
+.student-assessment-card .progress-bar .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745, #20c997);
+    border-radius: 10px;
+    transition: width 0.4s ease;
+    position: relative;
+}
+
+.student-assessment-card .progress-bar .progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.student-assessment-card .progress-percentage {
+    font-weight: 700;
+    color: #28a745;
+    font-size: 0.9rem;
+    min-width: 40px;
+    text-align: right;
+}
+
+.student-assessment-card .progress-label {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin: 0;
+    font-weight: 500;
+}
+
+.student-assessment-card .results-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.student-assessment-card .result-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: linear-gradient(135deg, #ffffff, #f8f9fc);
+    border-radius: 10px;
+    border: 1px solid #e1e8f0;
+    transition: all 0.2s ease;
+}
+
+.student-assessment-card .result-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.student-assessment-card .result-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.student-assessment-card .result-details {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.student-assessment-card .result-label {
+    font-size: 0.75rem;
+    color: #6c757d;
+    margin-bottom: 0.1rem;
+    font-weight: 500;
+}
+
+.student-assessment-card .result-value {
+    font-weight: 700;
+    color: #2c3e50;
+    font-size: 0.9rem;
+}
+
+.student-assessment-card .student-assessment-footer {
+    margin-top: auto;
+    padding-top: 1rem;
+    border-top: 1px solid #e9ecef;
+}
+
+.student-assessment-card .continue-button,
+.student-assessment-card .results-button {
+    width: 100%;
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: white;
+    border: none;
+    padding: 0.875rem 1rem;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
     position: relative;
     overflow: hidden;
-    height: 320px;
-    max-width: 280px;
+}
+
+.student-assessment-card .continue-button::before,
+.student-assessment-card .results-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.6s ease;
+}
+
+.student-assessment-card .continue-button:hover::before,
+.student-assessment-card .results-button:hover::before {
+    left: 100%;
+}
+
+.student-assessment-card .continue-button:hover:not(:disabled),
+.student-assessment-card .results-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 123, 255, 0.4);
+}
+
+.student-assessment-card .results-button {
+    background: linear-gradient(135deg, #28a745, #20c997);
+}
+
+.student-assessment-card .results-button:hover {
+    box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+}
+
+.student-assessment-card .continue-button:disabled {
+    background: linear-gradient(135deg, #6c757d, #5a6268);
+    cursor: not-allowed;
+    opacity: 0.7;
+    transform: none;
+    box-shadow: none;
+}
+
+.student-assessment-card .overdue-notice {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    color: #dc3545;
+    font-size: 0.85rem;
+    font-weight: 500;
+    margin-top: 0.75rem;
+    padding: 0.5rem;
+    background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+    border-radius: 8px;
+    border: 1px solid #f5c6cb;
+}
+
+/* Responsive Design for Student Cards */
+@media (max-width: 768px) {
+    .student-assessments-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .student-assessment-card {
+        padding: 1rem;
+    }
+
+    .student-assessment-card .student-assessment-header h3 {
+        font-size: 1.1rem;
+    }
+
+    .student-assessment-card .results-section {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+
+    .student-assessment-card .result-item {
+        padding: 0.5rem;
+    }
+
+    .student-assessment-card .result-icon {
+        width: 2rem;
+        height: 2rem;
+        font-size: 0.8rem;
+    }
+
+    .student-assessment-card .continue-button,
+    .student-assessment-card .results-button {
+        padding: 0.75rem;
+        font-size: 0.85rem;
+    }
+}
+
+/* Modern Teacher Assessment Cards - Clean Design */
+.teacher-assessment-card {
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e1e8ed;
+    transition: box-shadow 0.2s ease;
+    position: relative;
+    overflow: hidden;
+    height: 300px;
+    max-width: 400px;
     width: 100%;
     display: flex;
     flex-direction: column;
 }
 
 .teacher-assessment-card:hover {
-    transform: translateY(-8px);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
-    border-color: #3498db;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .teacher-assessment-card.completed {
-    background: linear-gradient(135deg, #f0f8f5 0%, #e8f5e8 100%);
-    border-color: #27ae60;
+    background: #f8fcf9;
+    border-color: #d4edda;
 }
 
 /* Card Status Bar */
 .card-status-bar {
-    height: 4px;
+    height: 3px;
     width: 100%;
     position: absolute;
     top: 0;
     left: 0;
-    border-radius: 16px 16px 0 0;
 }
 
 .completed-status {
-    background: linear-gradient(90deg, #27ae60, #2ecc71);
+    background: #28a745;
 }
 
 .overdue-status {
-    background: linear-gradient(90deg, #e74c3c, #ec7063);
+    background: #dc3545;
 }
 
 .urgent-status {
-    background: linear-gradient(90deg, #f39c12, #f7dc6f);
+    background: #fd7e14;
 }
 
 .warning-status {
-    background: linear-gradient(90deg, #f1c40f, #f4d03f);
+    background: #ffc107;
 }
 
 .normal-status {
-    background: linear-gradient(90deg, #3498db, #5dade2);
+    background: #007bff;
 }
 
 /* Card Header */
 .card-header {
-    padding: 1rem 1rem 0.5rem;
+    padding: 1.25rem 1.25rem 0.75rem;
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    gap: 0.75rem;
-    margin-top: 4px; /* Account for status bar */
+    gap: 1rem;
+    margin-top: 3px; /* Account for status bar */
 }
 
 .title-section {
     flex: 1;
-    min-width: 0; /* For text overflow */
+    min-width: 0;
 }
 
 .assessment-title {
     font-size: 1.1rem;
-    font-weight: 700;
-    color: #2c3e50;
+    font-weight: 600;
+    color: #343a40;
     margin: 0 0 0.5rem 0;
-    line-height: 1.2;
+    line-height: 1.3;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -1642,13 +1918,13 @@ const getProgressClass = (assessment) => {
     display: inline-flex;
     align-items: center;
     gap: 0.3rem;
-    background: linear-gradient(135deg, #3498db, #2980b9);
-    color: white;
+    background: #f8f9fa;
+    color: #495057;
     padding: 0.25rem 0.6rem;
-    border-radius: 15px;
+    border-radius: 12px;
     font-size: 0.75rem;
     font-weight: 500;
-    box-shadow: 0 2px 6px rgba(52, 152, 219, 0.25);
+    border: 1px solid #dee2e6;
 }
 
 .group-badge i {
@@ -1660,35 +1936,35 @@ const getProgressClass = (assessment) => {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    gap: 0.4rem;
-    min-width: 100px;
+    gap: 0.5rem;
+    min-width: 110px;
 }
 
 .date-info {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
-    padding: 0.4rem 0.7rem;
-    border-radius: 10px;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
     font-size: 0.8rem;
     font-weight: 500;
-    min-width: 0;
+    border: 1px solid;
 }
 
 .date-info.pending {
-    background: linear-gradient(135deg, #fff3cd, #ffeeba);
+    background: #fff3cd;
     color: #856404;
-    border: 1px solid #ffeaa7;
+    border-color: #ffeaa7;
 }
 
 .date-info.completed {
-    background: linear-gradient(135deg, #d4edda, #c3e6cb);
+    background: #d4edda;
     color: #155724;
-    border: 1px solid #b8daff;
+    border-color: #c3e6cb;
 }
 
 .date-info i {
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     flex-shrink: 0;
 }
 
@@ -1696,18 +1972,16 @@ const getProgressClass = (assessment) => {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-    min-width: 0;
 }
 
 .date-label {
     font-size: 0.65rem;
     opacity: 0.8;
-    margin-bottom: 0.05rem;
+    margin-bottom: 0.1rem;
 }
 
 .date-value {
     font-weight: 600;
-    white-space: nowrap;
     font-size: 0.75rem;
 }
 
@@ -1742,17 +2016,17 @@ const getProgressClass = (assessment) => {
 
 /* Card Content */
 .card-content {
-    padding: 0 1rem 1rem;
+    padding: 0 1.25rem 1rem;
     flex: 1;
     display: flex;
     flex-direction: column;
 }
 
 .assessment-description {
-    color: #5a6c7d;
+    color: #6c757d;
     line-height: 1.4;
     margin-bottom: 1rem;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
@@ -1776,24 +2050,20 @@ const getProgressClass = (assessment) => {
 .stat-item {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem;
-    background: rgba(255, 255, 255, 0.8);
-    border-radius: 10px;
-    border: 1px solid #e8ecf1;
-    transition: all 0.2s ease;
-}
-
-.stat-item:hover {
-    background: rgba(255, 255, 255, 1);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    justify-content: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+    text-align: left;
 }
 
 .stat-icon {
     width: 2rem;
     height: 2rem;
-    background: linear-gradient(135deg, #3498db, #2980b9);
-    border-radius: 8px;
+    background: #007bff;
+    border-radius: 6px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1805,27 +2075,31 @@ const getProgressClass = (assessment) => {
 .stat-details {
     display: flex;
     flex-direction: column;
-    min-width: 0;
+    justify-content: center;
+    align-items: flex-start;
+    flex: 1;
 }
 
 .stat-label {
     font-size: 0.7rem;
-    color: #7f8c8d;
+    color: #6c757d;
     margin-bottom: 0.1rem;
+    line-height: 1.2;
 }
 
 .stat-value {
-    font-weight: 700;
-    color: #2c3e50;
+    font-weight: 600;
+    color: #343a40;
     font-size: 0.9rem;
+    line-height: 1.2;
 }
 
 /* Progress Container */
 .progress-container {
-    background: rgba(255, 255, 255, 0.8);
-    border-radius: 10px;
+    background: #f8f9fa;
+    border-radius: 6px;
     padding: 0.75rem;
-    border: 1px solid #e8ecf1;
+    border: 1px solid #e9ecef;
 }
 
 .progress-header {
@@ -1837,161 +2111,119 @@ const getProgressClass = (assessment) => {
 
 .progress-label {
     font-size: 0.8rem;
-    color: #5a6c7d;
+    color: #6c757d;
     font-weight: 500;
 }
 
 .progress-percentage {
-    font-weight: 700;
-    color: #2c3e50;
+    font-weight: 600;
+    color: #343a40;
     font-size: 0.85rem;
 }
 
 .progress-bar-modern {
     height: 6px;
-    background: #ecf0f1;
-    border-radius: 4px;
+    background: #e9ecef;
+    border-radius: 3px;
     overflow: hidden;
-    position: relative;
 }
 
 .progress-fill {
     height: 100%;
-    border-radius: 6px;
-    transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-    position: relative;
-    overflow: hidden;
-}
-
-.progress-fill::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(45deg, rgba(255,255,255,0.2) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.2) 75%, transparent 75%, transparent);
-    background-size: 20px 20px;
-    animation: progress-shimmer 2s linear infinite;
-}
-
-@keyframes progress-shimmer {
-    0% { transform: translateX(-20px); }
-    100% { transform: translateX(20px); }
+    border-radius: 3px;
+    transition: width 0.3s ease;
 }
 
 .progress-complete {
-    background: linear-gradient(90deg, #27ae60, #2ecc71);
+    background: #28a745;
 }
 
 .progress-high {
-    background: linear-gradient(90deg, #3498db, #5dade2);
+    background: #007bff;
 }
 
 .progress-medium {
-    background: linear-gradient(90deg, #f39c12, #f7dc6f);
+    background: #ffc107;
 }
 
 .progress-low {
-    background: linear-gradient(90deg, #e67e22, #eb984e);
+    background: #fd7e14;
 }
 
 .progress-none {
-    background: linear-gradient(90deg, #e74c3c, #ec7063);
+    background: #dc3545;
 }
 
 /* Card Footer */
 .card-footer {
-    padding: 0.75rem 1rem 1rem;
-    background: rgba(248, 249, 252, 0.5);
-    border-top: 1px solid #e8ecf1;
+    padding: 1rem 1.25rem;
+    background: #f8f9fa;
+    border-top: 1px solid #e9ecef;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 0.75rem;
+    gap: 1rem;
     margin-top: auto;
 }
 
 .action-buttons {
     display: flex;
     gap: 0.5rem;
-    flex-wrap: wrap;
 }
 
 .action-btn {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
-    padding: 0.5rem 0.8rem;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
     border: none;
-    border-radius: 6px;
-    font-weight: 600;
-    font-size: 0.75rem;
+    border-radius: 4px;
+    font-weight: 500;
+    font-size: 0.8rem;
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.2s ease;
     text-decoration: none;
-    position: relative;
-    overflow: hidden;
-}
-
-.action-btn::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-    transition: left 0.5s;
-}
-
-.action-btn:hover::before {
-    left: 100%;
 }
 
 .action-btn.primary {
-    background: linear-gradient(135deg, #3498db, #2980b9);
+    background: #007bff;
     color: white;
-    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
 }
 
 .action-btn.primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+    background: #0056b3;
 }
 
 .action-btn.secondary {
-    background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+    background: #6c757d;
     color: white;
-    box-shadow: 0 4px 12px rgba(149, 165, 166, 0.3);
 }
 
 .action-btn.secondary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(149, 165, 166, 0.4);
+    background: #545b62;
 }
 
 .action-btn i {
-    font-size: 0.7rem;
+    font-size: 0.75rem;
 }
 
 .quick-stats {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 1rem;
 }
 
 .quick-stat {
     display: flex;
     align-items: center;
     gap: 0.3rem;
-    color: #7f8c8d;
+    color: #6c757d;
     font-size: 0.75rem;
     font-weight: 500;
 }
 
 .quick-stat i {
-    color: #3498db;
+    color: #007bff;
     font-size: 0.7rem;
 }
 
@@ -2004,7 +2236,6 @@ const getProgressClass = (assessment) => {
 
 @media (max-width: 768px) {
     .teacher-assessment-card {
-        min-height: auto;
         height: auto;
         max-width: 100%;
     }
@@ -2017,7 +2248,7 @@ const getProgressClass = (assessment) => {
         flex-direction: column;
         align-items: flex-start;
         gap: 0.75rem;
-        padding: 1rem 1rem 0.75rem;
+        padding: 1rem;
     }
 
     .status-section {
@@ -2045,15 +2276,15 @@ const getProgressClass = (assessment) => {
     .action-btn {
         justify-content: center;
         flex: 1;
-        font-size: 0.7rem;
-        padding: 0.4rem 0.6rem;
+        font-size: 0.75rem;
+        padding: 0.5rem;
     }
 
     .card-footer {
         flex-direction: column;
         align-items: stretch;
         gap: 0.75rem;
-        padding: 0.75rem;
+        padding: 1rem;
     }
 
     .quick-stats {
