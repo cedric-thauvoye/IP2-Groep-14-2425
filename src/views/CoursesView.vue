@@ -536,6 +536,30 @@ onMounted(async () => {
   margin-bottom: 2rem;
 }
 
+/* Mobile responsiveness for header */
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .actions {
+    align-self: stretch;
+  }
+
+  .action-button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .header {
+    margin-bottom: 1rem;
+  }
+}
+
 .title-section .subtitle {
   color: #7f8c8d;
   margin-top: 0.5rem;
@@ -546,6 +570,21 @@ onMounted(async () => {
   gap: .5rem;
   margin-bottom: 2rem;
   align-items: stretch;
+}
+
+/* Mobile responsiveness for filters */
+@media (max-width: 768px) {
+  .filters {
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .filters {
+    margin-bottom: 1rem;
+  }
 }
 
 .search-box {
@@ -587,6 +626,21 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 1.5rem;
+}
+
+/* Mobile responsiveness for courses grid */
+@media (max-width: 768px) {
+  .courses-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .courses-grid {
+    grid-template-columns: 1fr;
+    gap: 0.8rem;
+  }
 }
 
 .course-card {

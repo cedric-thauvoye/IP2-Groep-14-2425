@@ -454,6 +454,41 @@ onMounted(async () => {
   margin-bottom: 2rem;
 }
 
+/* Mobile responsiveness for header */
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    align-items: stretch;
+  }
+
+  .actions {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .action-button {
+    flex: 1;
+    min-width: 120px;
+  }
+}
+
+@media (max-width: 480px) {
+  .header {
+    margin-bottom: 1rem;
+  }
+
+  .actions {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .action-button {
+    width: 100%;
+  }
+}
+
 .header h1 {
   margin: 0;
   color: #2c3e50;
@@ -465,6 +500,26 @@ onMounted(async () => {
   gap: .5rem; /* Significantly increased gap between search and filter */
   margin-bottom: 2rem;
   align-items: stretch; /* Ensure all elements stretch to the same height */
+}
+
+/* Mobile responsiveness for filters */
+@media (max-width: 768px) {
+  .filters {
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .filter-options select {
+    min-width: auto;
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .filters {
+    margin-bottom: 1rem;
+  }
 }
 
 .search-box {
@@ -557,6 +612,21 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 1.5rem;
+}
+
+/* Mobile responsiveness for groups grid */
+@media (max-width: 768px) {
+  .groups-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .groups-grid {
+    grid-template-columns: 1fr;
+    gap: 0.8rem;
+  }
 }
 
 .group-card {

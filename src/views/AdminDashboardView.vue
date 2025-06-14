@@ -1140,6 +1140,35 @@ onMounted(() => {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
+/* Mobile responsiveness for nav pills */
+@media (max-width: 768px) {
+    .nav-pills {
+        flex-wrap: wrap;
+        gap: 0.3rem;
+        padding: 0.4rem;
+    }
+
+    .nav-pill {
+        flex: 1;
+        min-width: 100px;
+        justify-content: center;
+        padding: 0.6rem 1rem;
+        font-size: 0.9rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .nav-pills {
+        flex-direction: column;
+        gap: 0.2rem;
+    }
+
+    .nav-pill {
+        width: 100%;
+        padding: 0.8rem 1rem;
+    }
+}
+
 .nav-pill {
     background: none;
     border: none;
@@ -1166,6 +1195,22 @@ onMounted(() => {
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
     gap: 1.5rem;
     margin-bottom: 2rem;
+}
+
+/* Mobile responsiveness for overview stats */
+@media (max-width: 768px) {
+    .overview-stats {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .overview-stats {
+        gap: 0.8rem;
+        margin-bottom: 1rem;
+    }
 }
 
 .stat-card {
