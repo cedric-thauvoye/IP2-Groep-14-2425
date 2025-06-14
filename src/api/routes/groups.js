@@ -542,31 +542,11 @@ module.exports = (pool) => {
           [id]
         );
 
-        // Delete assessment results
         if (assessments.length > 0) {
-          for (const assessment of assessments) {
-            // Delete assessment criteria
-            await conn.execute(
-              'DELETE FROM assessment_criteria WHERE assessment_id = ?',
-              [assessment.id]
-            );
-
-            // Delete assessment results
-            await conn.execute(
-              'DELETE FROM assessment_results WHERE assessment_id = ?',
-              [assessment.id]
-            );
-
-            // Delete assessment submissions
-            await conn.execute(
-              'DELETE FROM assessment_submissions WHERE assessment_id = ?',
-              [assessment.id]
-            );
-          }
-
-          // Delete assessments
+          // Instead of deleting assessments, update them to set group_id to NULL
+          // This matches the ON DELETE SET NULL constraint in the database schema
           await conn.execute(
-            'DELETE FROM assessments WHERE group_id = ?',
+            'UPDATE assessments SET group_id = NULL WHERE group_id = ?',
             [id]
           );
         }
