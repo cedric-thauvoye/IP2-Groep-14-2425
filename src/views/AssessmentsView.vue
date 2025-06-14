@@ -1398,7 +1398,7 @@ const getProgressClass = (assessment) => {
 /* Teacher Assessment Cards Grid */
 .group-assessments {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 1.5rem;
     margin-top: 1rem;
 }
@@ -1914,8 +1914,8 @@ const getProgressClass = (assessment) => {
     transition: box-shadow 0.2s ease;
     position: relative;
     overflow: hidden;
-    height: 300px;
-    max-width: 400px;
+    height: 350px;
+    max-width: 450px;
     width: 100%;
     display: flex;
     flex-direction: column;
