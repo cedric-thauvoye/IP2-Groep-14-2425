@@ -3,6 +3,14 @@
         <button v-if="isSmallScreen" @click="toggleNavBar" class="toggle-button">
             <i class="fas fa-bars"></i>
         </button>
+
+        <!-- Mobile overlay backdrop -->
+        <div
+            v-if="isSmallScreen && isNavBarVisible"
+            class="nav-overlay"
+            @click="toggleNavBar"
+        ></div>
+
         <nav class="navBar" v-if="user" :class="{ show: isNavBarVisible || !isSmallScreen }">
             <button v-if="isSmallScreen" @click="toggleNavBar" class="close-button">
                 <i class="fas fa-times"></i>
@@ -26,27 +34,27 @@
             <div class="navOptions">
                 <div class="nav-section">
                     <h3>Main</h3>
-                    <NavOption to="/home">
+                    <NavOption to="/home" @click="handleNavOptionClick">
                         <i class="fas fa-home"></i> Dashboard
                     </NavOption>
                 </div>
 
                 <div class="nav-section">
                     <h3>Academic</h3>
-                    <NavOption to="/courses">
+                    <NavOption to="/courses" @click="handleNavOptionClick">
                         <i class="fas fa-book"></i> Courses
                     </NavOption>
-                    <NavOption to="/groups">
+                    <NavOption to="/groups" @click="handleNavOptionClick">
                         <i class="fas fa-users"></i> Groups
                     </NavOption>
                 </div>
 
                 <div class="nav-section" v-if="isTeacher">
                     <h3>Management</h3>
-                    <NavOption to="/students">
+                    <NavOption to="/students" @click="handleNavOptionClick">
                         <i class="fas fa-user-graduate"></i> Students
                     </NavOption>
-                    <NavOption to="/import">
+                    <NavOption to="/import" @click="handleNavOptionClick">
                         <i class="fas fa-file-import"></i> Import Data
                     </NavOption>
                 </div>
@@ -54,17 +62,17 @@
                 <!-- Admin Section -->
                 <div class="nav-section" v-if="isAdmin">
                     <h3>Administration</h3>
-                    <NavOption to="/admin">
+                    <NavOption to="/admin" @click="handleNavOptionClick">
                         <i class="fas fa-cog"></i> Admin Dashboard
                     </NavOption>
                 </div>
 
                 <div class="nav-section">
                     <h3>Assessments</h3>
-                    <NavOption to="/assessments">
+                    <NavOption to="/assessments" @click="handleNavOptionClick">
                         <i class="fas fa-tasks"></i> {{ isTeacher || isAdmin ? 'Assessments' : 'My Assessments' }}
                     </NavOption>
-                    <NavOption to="/results" v-if="isTeacher">
+                    <NavOption to="/results" v-if="isTeacher" @click="handleNavOptionClick">
                         <i class="fas fa-chart-bar"></i> Results
                     </NavOption>
                 </div>
@@ -88,16 +96,38 @@ import { logout } from '../../services/msalService';
 
 const user = ref(null);
 const isNavBarVisible = ref(false);
-const isSmallScreen = ref(window.innerWidth < 1150);
+const isSmallScreen = ref(window.innerWidth < 768); // Changed from 1150 to 768 for mobile
 const router = useRouter();
 
 const toggleNavBar = () => {
     isNavBarVisible.value = !isNavBarVisible.value;
-    document.querySelector('main').style.marginLeft = isNavBarVisible.value ? '20%' : '0';
+
+    // Add/remove body scroll lock when menu is open on mobile
+    if (isSmallScreen.value) {
+        document.body.style.overflow = isNavBarVisible.value ? 'hidden' : '';
+    }
+
+    const mainElement = document.querySelector('main');
+    if (mainElement) {
+        if (isSmallScreen.value) {
+            // On mobile, don't adjust margin, just handle overlay
+            mainElement.style.marginLeft = '';
+        } else {
+            // On larger screens, adjust margin as before
+            mainElement.style.marginLeft = isNavBarVisible.value ? '20%' : '0';
+        }
+    }
 };
 
 const updateScreenSize = () => {
-    isSmallScreen.value = window.innerWidth < 1150;
+    const previousIsSmallScreen = isSmallScreen.value;
+    isSmallScreen.value = window.innerWidth < 768; // Changed from 1150 to 768
+
+    // Reset body overflow when switching from mobile to desktop
+    if (previousIsSmallScreen && !isSmallScreen.value) {
+        document.body.style.overflow = '';
+    }
+
     if (!isSmallScreen.value) {
         isNavBarVisible.value = true;
         document.querySelector('main').style.marginLeft = '20%';
@@ -107,10 +137,97 @@ const updateScreenSize = () => {
     }
 };
 
-window.addEventListener('resize', updateScreenSize);
+// Close nav when clicking outside on mobile
+const handleClickOutside = (event) => {
+    if (isSmallScreen.value && isNavBarVisible.value) {
+        const navBar = document.querySelector('.navBar');
+        const toggleButton = document.querySelector('.toggle-button');
+
+        if (navBar && !navBar.contains(event.target) && !toggleButton.contains(event.target)) {
+            toggleNavBar();
+        }
+    }
+};
+
+// Handle nav option click - close mobile nav
+const handleNavOptionClick = () => {
+    if (isSmallScreen.value && isNavBarVisible.value) {
+        toggleNavBar();
+    }
+};
+
+// Touch gesture handling for mobile
+let touchStartX = 0;
+let touchStartY = 0;
+
+const handleTouchStart = (event) => {
+    if (isSmallScreen.value && isNavBarVisible.value) {
+        touchStartX = event.touches[0].clientX;
+        touchStartY = event.touches[0].clientY;
+    }
+};
+
+const handleTouchEnd = (event) => {
+    if (isSmallScreen.value && isNavBarVisible.value) {
+        const touchEndX = event.changedTouches[0].clientX;
+        const touchEndY = event.changedTouches[0].clientY;
+        const deltaX = touchEndX - touchStartX;
+        const deltaY = touchEndY - touchStartY;
+
+        // Check if it's a horizontal swipe (more horizontal than vertical movement)
+        if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
+            // Swipe left to close navigation
+            if (deltaX < -50) {
+                toggleNavBar();
+            }
+        }
+    }
+};
+
+// Add event listener for clicks outside
+onMounted(async () => {
+    document.addEventListener('click', handleClickOutside);
+    document.addEventListener('touchstart', handleTouchStart, { passive: true });
+    document.addEventListener('touchend', handleTouchEnd, { passive: true });
+    window.addEventListener('resize', updateScreenSize);
+
+    // Check if there's a saved token
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+        try {
+            const response = await authService.getCurrentUser();
+            console.table(response.data.user);
+            // Handle different property naming conventions that might come from the API
+            user.value = {
+                ...response.data.user,
+                firstName: response.data.user.first_name || response.data.user.firstName,
+                lastName: response.data.user.last_name || response.data.user.lastName
+            };
+
+            console.log("user", user.value);
+
+            // Get user role - use the new function
+            await checkUserRole();
+        } catch (error) {
+            console.error('Failed to retrieve user:', error);
+            // Clear invalid token
+            localStorage.removeItem('auth_token');
+            router.push('/');
+        }
+    } else {
+        router.push('/');
+    }
+
+    updateScreenSize();
+});
 
 onBeforeUnmount(() => {
+    document.removeEventListener('click', handleClickOutside);
+    document.removeEventListener('touchstart', handleTouchStart);
+    document.removeEventListener('touchend', handleTouchEnd);
     window.removeEventListener('resize', updateScreenSize);
+    // Reset body overflow on unmount
+    document.body.style.overflow = '';
 });
 
 const getInitials = computed(() => {
@@ -118,7 +235,6 @@ const getInitials = computed(() => {
   const last = user.value.lastName || user.value.last_name || '';
   return `${first?.[0] || ''}${last?.[0] || ''}`.toUpperCase();
 });
-
 
 const signOutUser = async () => {
     try {
@@ -158,42 +274,57 @@ const checkUserRole = async () => {
         console.error('Error checking user role:', error);
     }
 };
-
-onMounted(async () => {
-    // Check if there's a saved token
-    const token = localStorage.getItem('auth_token');
-    if (token) {
-        try {
-            const response = await authService.getCurrentUser();
-            console.table(response.data.user);
-            // Handle different property naming conventions that might come from the API
-            user.value = {
-                ...response.data.user,
-                firstName: response.data.user.first_name || response.data.user.firstName,
-                lastName: response.data.user.last_name || response.data.user.lastName
-            };
-
-            console.log("user", user.value);
-
-            // Get user role - use the new function
-            await checkUserRole();
-        } catch (error) {
-            console.error('Failed to retrieve user:', error);
-            // Clear invalid token
-            localStorage.removeItem('auth_token');
-            router.push('/');
-        }
-    } else {
-        router.push('/');
-    }
-
-    updateScreenSize();
-});
 </script>
 
 <style scoped>
 .nav-container {
     display: flex;
+}
+
+/* Mobile overlay backdrop */
+.nav-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 999;
+    opacity: 0;
+    animation: fadeIn 0.3s ease forwards;
+}
+
+@keyframes fadeIn {
+    to {
+        opacity: 1;
+    }
+}
+
+/* Mobile toggle button */
+.toggle-button {
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    z-index: 1001;
+    background-color: #3498DB;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    width: 45px;
+    height: 45px;
+    font-size: 18px;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+}
+
+.toggle-button:hover {
+    background-color: #2980B9;
+    transform: scale(1.05);
+}
+
+.toggle-button:active {
+    transform: scale(0.95);
 }
 
 .navBar {
@@ -211,12 +342,28 @@ onMounted(async () => {
     box-sizing: border-box;
     transform: translateX(-100%);
     transition: transform 0.3s ease;
-    overflow-y: auto; /* Enable vertical scrolling */
-    overflow-x: hidden; /* Hide horizontal scrollbar */
+    overflow-y: auto;
+    overflow-x: hidden;
+    z-index: 1000;
 
     /* Updated scrollbar styling */
     scrollbar-width: thin;
     scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+/* Mobile styles */
+@media (max-width: 768px) {
+    .navBar {
+        width: 280px; /* Fixed width for mobile instead of percentage */
+        box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
+    }
+}
+
+/* Tablet styles */
+@media (min-width: 769px) and (max-width: 1150px) {
+    .navBar {
+        width: 25%; /* Slightly wider for tablets */
+    }
 }
 
 /* Updated WebKit scrollbar styling */
@@ -238,20 +385,24 @@ onMounted(async () => {
     transform: translateX(0);
 }
 
-.toggle-button,
 .close-button {
-    background-color: #e6e6e6;
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background-color: rgba(255, 255, 255, 0.2);
+    color: white;
     border: none;
-    font-size: 24px;
+    border-radius: 50%;
+    width: 35px;
+    height: 35px;
+    font-size: 16px;
     cursor: pointer;
+    transition: all 0.3s ease;
 }
 
-.toggle-button {
-    margin-left: 10px;
-}
-
-.close-button {
-    align-self: flex-end;
+.close-button:hover {
+    background-color: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
 }
 
 /* PROFILE */
@@ -266,15 +417,25 @@ onMounted(async () => {
     margin: 20px 0;
 }
 
+@media (max-width: 768px) {
+    .profile {
+        margin: 70px 0 20px 0; /* Add top margin to account for close button */
+        padding: 15px;
+    }
+}
+
 .profile-info {
     display: flex;
     flex-direction: column;
+    min-width: 0; /* Prevent overflow */
 }
 
 .profile .displayName {
     color: white;
     font-weight: bold;
     margin: 0;
+    font-size: 14px;
+    word-wrap: break-word;
 }
 
 .profile .role {
@@ -291,6 +452,14 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0; /* Prevent shrinking */
+}
+
+@media (max-width: 768px) {
+    .avatar {
+        width: 40px;
+        height: 40px;
+    }
 }
 
 .avatar img {
@@ -306,6 +475,12 @@ onMounted(async () => {
   font-size: 18px;
 }
 
+@media (max-width: 768px) {
+    .avatar.initials {
+        font-size: 14px;
+    }
+}
+
 
 /* NAV OPTIONS */
 .navOptions {
@@ -313,6 +488,7 @@ onMounted(async () => {
     margin-top: 20px;
     flex-direction: column;
     width: 100%;
+    padding-bottom: 20px; /* Add bottom padding for mobile */
 }
 
 .nav-section {
@@ -321,12 +497,26 @@ onMounted(async () => {
     padding: 0 15px;
 }
 
+@media (max-width: 768px) {
+    .nav-section {
+        padding: 0 10px;
+    }
+}
+
 .nav-section h3 {
     color: #ECF0F1;
     font-size: 0.8em;
     text-transform: uppercase;
     margin: 20px 0 10px 0;
     padding-left: 10px;
+}
+
+@media (max-width: 768px) {
+    .nav-section h3 {
+        font-size: 0.75em;
+        margin: 15px 0 8px 0;
+        padding-left: 5px;
+    }
 }
 
 .bottom-section {
@@ -341,5 +531,12 @@ onMounted(async () => {
 i {
     margin-right: 10px;
     width: 20px;
+}
+
+@media (max-width: 768px) {
+    i {
+        margin-right: 8px;
+        width: 18px;
+    }
 }
 </style>

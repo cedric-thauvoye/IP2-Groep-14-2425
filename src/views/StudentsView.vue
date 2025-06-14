@@ -29,12 +29,6 @@
                             </option>
                         </select>
 
-                        <select v-model="filters.qNumberFilter" @change="filterStudents" class="filter-select">
-                            <option value="all">All Q-Numbers</option>
-                            <option value="valid">Valid Format</option>
-                            <option value="missing">Missing Q-Number</option>
-                        </select>
-
                         <select v-model="sortBy" @change="sortStudents" class="filter-select">
                             <option value="name-asc">Name (A-Z)</option>
                             <option value="name-desc">Name (Z-A)</option>
@@ -246,15 +240,13 @@ const availableCourses = ref([]);
 const studentCourses = ref({}); // Map of student ID to courses
 const sortBy = ref('name-asc');
 const filters = ref({
-    courseFilter: 'all',
-    qNumberFilter: 'all'
+    courseFilter: 'all'
 });
 
 // Computed property to check if filters are active
 const hasActiveFilters = computed(() => {
     return searchQuery.value !== '' ||
            filters.value.courseFilter !== 'all' ||
-           filters.value.qNumberFilter !== 'all' ||
            sortBy.value !== 'name-asc';
 });
 
@@ -354,15 +346,6 @@ const filterStudents = () => {
         }
     }
 
-    // Q-Number filter
-    if (filters.value.qNumberFilter !== 'all') {
-        if (filters.value.qNumberFilter === 'valid') {
-            filtered = filtered.filter(student => isValidQNumber(student.q_number));
-        } else if (filters.value.qNumberFilter === 'missing') {
-            filtered = filtered.filter(student => !student.q_number || student.q_number.trim() === '');
-        }
-    }
-
     filteredStudents.value = filtered;
     sortStudents();
 };
@@ -404,7 +387,6 @@ const sortStudents = () => {
 const clearFilters = () => {
     searchQuery.value = '';
     filters.value.courseFilter = 'all';
-    filters.value.qNumberFilter = 'all';
     sortBy.value = 'name-asc';
     filterStudents();
 };

@@ -31,7 +31,7 @@
              class="course-card"
              :class="{ active: course.isActive }"
         >
-          <div class="course-header" :style="{ backgroundColor: getRandomColor() }">
+          <div class="course-header" :style="{ backgroundColor: getCourseColor(course.id) }">
             <i class="fas fa-book"></i>
           </div>
           <div class="course-content">
@@ -72,7 +72,7 @@
 
       <!-- Create Course Modal -->
       <div v-if="showCreateCourseModal" class="modal-overlay">
-        <div class="modal-content">
+        <div class="modal-content create-course-modal">
           <div class="modal-header">
             <h2>Create New Course</h2>
             <button class="close-button" @click="showCreateCourseModal = false">
@@ -81,25 +81,29 @@
           </div>
           <div class="modal-body">
             <form @submit.prevent="createNewCourse">
-              <div class="form-group">
-                <label for="new-course-name">Course Name*</label>
-                <input
-                  type="text"
-                  id="new-course-name"
-                  v-model="newCourse.name"
-                  required
-                  placeholder="Enter course name"
-                >
-              </div>
-              <div class="form-group">
-                <label for="new-course-code">Course Code*</label>
-                <input
-                  type="text"
-                  id="new-course-code"
-                  v-model="newCourse.code"
-                  required
-                  placeholder="Enter course code (e.g. CS101)"
-                >
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="new-course-name">Course Name*</label>
+                  <input
+                    type="text"
+                    id="new-course-name"
+                    v-model="newCourse.name"
+                    required
+                    placeholder="Enter course name"
+                    class="form-input"
+                  >
+                </div>
+                <div class="form-group">
+                  <label for="new-course-code">Course Code*</label>
+                  <input
+                    type="text"
+                    id="new-course-code"
+                    v-model="newCourse.code"
+                    required
+                    placeholder="Enter course code (e.g. CS101)"
+                    class="form-input"
+                  >
+                </div>
               </div>
               <div class="form-group">
                 <label for="new-course-description">Description</label>
@@ -108,6 +112,7 @@
                   v-model="newCourse.description"
                   rows="4"
                   placeholder="Describe the course content and objectives"
+                  class="form-textarea"
                 ></textarea>
               </div>
 
@@ -129,16 +134,17 @@
                   </div>
                 </div>
 
-                <!-- Student Selector -->
-                <div class="student-selector">
-                  <div class="search-box">
+                <!-- Enhanced Student Selector -->
+                <div class="student-selector-enhanced">
+                  <div class="search-box-enhanced">
                     <i class="fas fa-search"></i>
                     <input
                       type="text"
                       v-model="studentSearchQuery"
-                      placeholder="Search students..."
+                      placeholder="Search students by name or email..."
                       @input="filterStudents"
                       @focus="loadStudentsIfNeeded"
+                      class="search-input"
                     >
                   </div>
 
@@ -147,11 +153,12 @@
                     <span>Loading students...</span>
                   </div>
 
-                  <div v-else-if="filteredStudents.length > 0" class="students-select-list compact">
+                  <div v-else-if="filteredStudents.length > 0" class="students-select-list-enhanced">
                     <div
-                      v-for="student in filteredStudents.slice(0, 5)"
+                      v-for="student in filteredStudents.slice(0, 6)"
                       :key="student.id"
-                      class="student-select-item"
+                      class="student-select-item-enhanced"
+                      :class="{ selected: selectedStudentIds.includes(student.id) }"
                       @click="toggleStudentSelection(student.id)"
                     >
                       <div class="student-info">
@@ -161,12 +168,22 @@
                         <div class="student-details">
                           <h3>{{ student.first_name }} {{ student.last_name }}</h3>
                           <p class="student-email">{{ student.email }}</p>
+                          <p v-if="student.q_number" class="student-id">{{ student.q_number }}</p>
                         </div>
                       </div>
+                      <div class="selection-indicator">
+                        <i v-if="selectedStudentIds.includes(student.id)" class="fas fa-check-circle"></i>
+                        <i v-else class="far fa-circle"></i>
+                      </div>
                     </div>
-                    <div v-if="filteredStudents.length > 5" class="more-students">
-                      And {{ filteredStudents.length - 5 }} more...
+                    <div v-if="filteredStudents.length > 6" class="more-students">
+                      And {{ filteredStudents.length - 6 }} more students match your search...
                     </div>
+                  </div>
+
+                  <div v-else-if="studentSearchQuery && !loadingStudents" class="no-results">
+                    <i class="fas fa-user-slash"></i>
+                    <p>No students found matching "{{ studentSearchQuery }}"</p>
                   </div>
                 </div>
               </div>
@@ -180,7 +197,7 @@
                   :disabled="isCreating"
                 >
                   <i v-if="isCreating" class="fas fa-spinner fa-spin"></i>
-                  <span v-else>Create Course</span>
+                  <span v-else><i class="fas fa-plus"></i> Create Course</span>
                 </button>
               </div>
             </form>
@@ -190,7 +207,7 @@
 
       <!-- Edit Course Modal -->
       <div v-if="showEditCourseModal && editingCourse" class="modal-overlay">
-        <div class="modal-content">
+        <div class="modal-content edit-course-modal">
           <div class="modal-header">
             <h2>Edit Course</h2>
             <button class="close-button" @click="showEditCourseModal = false">
@@ -199,23 +216,29 @@
           </div>
           <div class="modal-body">
             <form @submit.prevent="saveEditedCourse">
-              <div class="form-group">
-                <label for="course-name">Course Name</label>
-                <input
-                  type="text"
-                  id="course-name"
-                  v-model="editingCourse.name"
-                  required
-                >
-              </div>
-              <div class="form-group">
-                <label for="course-code">Course Code</label>
-                <input
-                  type="text"
-                  id="course-code"
-                  v-model="editingCourse.code"
-                  required
-                >
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="course-name">Course Name*</label>
+                  <input
+                    type="text"
+                    id="course-name"
+                    v-model="editingCourse.name"
+                    required
+                    placeholder="Enter course name"
+                    class="form-input"
+                  >
+                </div>
+                <div class="form-group">
+                  <label for="course-code">Course Code*</label>
+                  <input
+                    type="text"
+                    id="course-code"
+                    v-model="editingCourse.code"
+                    required
+                    placeholder="Enter course code"
+                    class="form-input"
+                  >
+                </div>
               </div>
               <div class="form-group">
                 <label for="course-description">Description</label>
@@ -223,6 +246,8 @@
                   id="course-description"
                   v-model="editingCourse.description"
                   rows="4"
+                  placeholder="Describe the course content and objectives"
+                  class="form-textarea"
                 ></textarea>
               </div>
               <div class="form-actions">
@@ -230,7 +255,7 @@
                   Cancel
                 </button>
                 <button type="submit" class="save-button">
-                  Save Changes
+                  <i class="fas fa-save"></i> Save Changes
                 </button>
               </div>
             </form>
@@ -301,9 +326,10 @@ const studentSearchQuery = ref('');
 const filteredStudents = ref([]);
 const loadingStudents = ref(false);
 
-const getRandomColor = () => {
+// Create a stable color mapping for courses
+const getCourseColor = (courseId) => {
   const colors = ['#3498db', '#2ecc71', '#e74c3c', '#f1c40f', '#9b59b6', '#1abc9c'];
-  return colors[Math.floor(Math.random() * colors.length)];
+  return colors[courseId % colors.length];
 };
 
 const filteredCourses = computed(() => {
@@ -358,19 +384,18 @@ const createNewCourse = async () => {
       }
     }
 
-    courses.value.push({
-      ...response.data,
-      isActive: true,
-      student_count: selectedStudentIds.value.length,
-      teacher_count: 1,
-      group_count: 0
-    });
+    // Refresh the courses list to show the new course
+    const coursesResponse = await courseService.getCourses(isTeacher.value ? 'true' : false);
+    courses.value = coursesResponse.data.map(course => ({
+      ...course,
+      isActive: true
+    }));
 
-    // Reset form
+    // Reset form and close modal
     resetCreateCourseForm();
     showCreateCourseModal.value = false;
 
-    router.push(`/course/${courseId}`);
+    // Stay on courses page instead of navigating
   } catch (error) {
     console.error('Error creating course:', error);
     alert('Failed to create course. Please check if the course code is unique.');
@@ -422,12 +447,13 @@ const loadStudentsIfNeeded = async () => {
 const fetchAvailableStudents = async () => {
   loadingStudents.value = true;
   try {
-    const response = await userService.getAllStudents();
+    const response = await userService.getStudents();
     availableStudents.value = response.data || [];
-    filterStudents();
+    filterStudents(); // Apply initial filter
   } catch (error) {
     console.error('Error fetching students:', error);
     availableStudents.value = [];
+    filteredStudents.value = [];
   } finally {
     loadingStudents.value = false;
   }
@@ -435,12 +461,16 @@ const fetchAvailableStudents = async () => {
 
 const filterStudents = () => {
   const query = studentSearchQuery.value.toLowerCase();
-  filteredStudents.value = availableStudents.value.filter(student => {
-    const fullName = `${student.first_name} ${student.last_name}`.toLowerCase();
-    const email = student.email.toLowerCase();
-    const qNumber = student.q_number?.toLowerCase() || '';
-    return fullName.includes(query) || email.includes(query) || qNumber.includes(query);
-  });
+  if (!query.trim()) {
+    filteredStudents.value = availableStudents.value.slice(0, 10); // Show first 10 when no search
+  } else {
+    filteredStudents.value = availableStudents.value.filter(student => {
+      const fullName = `${student.first_name} ${student.last_name}`.toLowerCase();
+      const email = student.email.toLowerCase();
+      const qNumber = student.q_number?.toLowerCase() || '';
+      return fullName.includes(query) || email.includes(query) || qNumber.includes(query);
+    });
+  }
 };
 
 const toggleStudentSelection = (studentId) => {
@@ -506,6 +536,30 @@ onMounted(async () => {
   margin-bottom: 2rem;
 }
 
+/* Mobile responsiveness for header */
+@media (max-width: 768px) {
+  .header {
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .actions {
+    align-self: stretch;
+  }
+
+  .action-button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .header {
+    margin-bottom: 1rem;
+  }
+}
+
 .title-section .subtitle {
   color: #7f8c8d;
   margin-top: 0.5rem;
@@ -516,6 +570,21 @@ onMounted(async () => {
   gap: .5rem;
   margin-bottom: 2rem;
   align-items: stretch;
+}
+
+/* Mobile responsiveness for filters */
+@media (max-width: 768px) {
+  .filters {
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .filters {
+    margin-bottom: 1rem;
+  }
 }
 
 .search-box {
@@ -559,6 +628,21 @@ onMounted(async () => {
   gap: 1.5rem;
 }
 
+/* Mobile responsiveness for courses grid */
+@media (max-width: 768px) {
+  .courses-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .courses-grid {
+    grid-template-columns: 1fr;
+    gap: 0.8rem;
+  }
+}
+
 .course-card {
   background: white;
   border-radius: 10px;
@@ -568,7 +652,7 @@ onMounted(async () => {
 }
 
 .course-card:hover {
-  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
 }
 
 .course-header {
@@ -628,6 +712,13 @@ onMounted(async () => {
   padding: 0.5rem 1rem;
   border-radius: 6px;
   font-size: 0.9rem;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.view-button:hover {
+  background-color: #2c7cb8;
+  border-color: #2c7cb8;
 }
 
 .teacher-actions {
@@ -642,7 +733,7 @@ onMounted(async () => {
   color: #7f8c8d;
   padding: 0.5rem;
   border-radius: 4px;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
 }
 
 .icon-button.edit:hover {
@@ -676,11 +767,11 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  transition: background-color 0.2s;
+  transition: background-color 0.3s ease;
 }
 
 .action-button:hover {
-  background-color: #2980b9;
+  background-color: #2c7cb8;
 }
 
 .modal-overlay {
@@ -698,11 +789,287 @@ onMounted(async () => {
 
 .modal-content {
   background: white;
-  border-radius: 10px;
+  border-radius: 12px;
   width: 500px;
   max-width: 90%;
   max-height: 90vh;
   overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+/* Enhanced Create Course Modal */
+.create-course-modal {
+  width: 700px;
+  max-width: 95%;
+}
+
+.create-course-modal .modal-body {
+  padding: 2rem;
+}
+
+/* Enhanced Edit Course Modal */
+.edit-course-modal {
+  width: 600px;
+  max-width: 95%;
+}
+
+.edit-course-modal .modal-body {
+  padding: 2rem;
+}
+
+/* Form Layout Improvements */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+  color: #2c3e50;
+  font-size: 0.95rem;
+}
+
+.form-input,
+.form-textarea {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  border: 2px solid #e1e8ed;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  background-color: #fafbfc;
+  box-sizing: border-box;
+}
+
+.form-input:focus,
+.form-textarea:focus {
+  outline: none;
+  border-color: #3498db;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.form-input::placeholder,
+.form-textarea::placeholder {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+/* Enhanced Student Selector */
+.student-selector-enhanced {
+  margin-top: 1rem;
+  border: 1px solid #e1e8ed;
+  border-radius: 8px;
+  background: #f8f9fa;
+}
+
+.search-box-enhanced {
+  position: relative;
+  padding: 1rem;
+  border-bottom: 1px solid #e1e8ed;
+  background: white;
+  border-radius: 8px 8px 0 0;
+}
+
+.search-box-enhanced i {
+  position: absolute;
+  left: 1.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #6c757d;
+  z-index: 1;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.75rem 1rem 0.75rem 2.5rem;
+  border: 2px solid #e1e8ed;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  background-color: #fafbfc;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #3498db;
+  background-color: white;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.students-select-list-enhanced {
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 0.5rem;
+}
+
+.student-select-item-enhanced {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-radius: 8px;
+  background: white;
+  border: 2px solid transparent;
+  margin-bottom: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.student-select-item-enhanced:hover {
+  background-color: #f8f9fa;
+  border-color: #dee2e6;
+}
+
+.student-select-item-enhanced.selected {
+  background-color: #e3f2fd;
+  border-color: #2196f3;
+}
+
+.student-select-item-enhanced .student-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+}
+
+.student-select-item-enhanced .student-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3498db, #2980b9);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.student-select-item-enhanced .student-details h3 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1rem;
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+.student-select-item-enhanced .student-email,
+.student-select-item-enhanced .student-id {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #6c757d;
+}
+
+.selection-indicator {
+  color: #3498db;
+  font-size: 1.2rem;
+  margin-left: 1rem;
+}
+
+.selection-indicator .fa-check-circle {
+  color: #27ae60;
+}
+
+.no-results {
+  text-align: center;
+  padding: 2rem;
+  color: #6c757d;
+}
+
+.no-results i {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+/* Form Actions Enhancement */
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e1e8ed;
+}
+
+.cancel-button,
+.save-button {
+  padding: 0.875rem 1.5rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cancel-button {
+  background: #f8f9fa;
+  border: 2px solid #e1e8ed;
+  color: #6c757d;
+}
+
+.cancel-button:hover {
+  background: #e9ecef;
+  border-color: #ced4da;
+  color: #495057;
+}
+
+.save-button {
+  background: linear-gradient(135deg, #3498db, #2980b9);
+  color: white;
+  border: 2px solid transparent;
+}
+
+.save-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2c7cb8, #1d5a7b);
+}
+
+.save-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+  .create-course-modal,
+  .edit-course-modal {
+    width: 95%;
+    margin: 1rem;
+  }
+
+  .create-course-modal .modal-body,
+  .edit-course-modal .modal-body {
+    padding: 1.5rem;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .form-actions {
+    flex-direction: column-reverse;
+  }
+
+  .cancel-button,
+  .save-button {
+    width: 100%;
+    justify-content: center;
+  }
 }
 
 .modal-header {
@@ -724,7 +1091,7 @@ onMounted(async () => {
   font-size: 1.2rem;
   cursor: pointer;
   color: #7f8c8d;
-  transition: color 0.2s;
+  transition: all 0.3s ease;
   padding: 0.5rem;
   display: flex;
   align-items: center;
@@ -833,7 +1200,7 @@ onMounted(async () => {
   border-radius: 4px;
   cursor: pointer;
   font-size: 1rem;
-  transition: background-color 0.2s;
+  transition: background-color 0.3s ease;
 }
 
 .cancel-button:hover {
@@ -917,7 +1284,7 @@ onMounted(async () => {
 
 .student-select-item {
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s ease;
   border-radius: 8px;
   padding: 0.75rem;
   border: 1px solid #e9ecef;
@@ -927,9 +1294,7 @@ onMounted(async () => {
 
 .student-select-item:hover {
   background-color: #f8f9fa;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  border-color: #3498db;
+  border-color: #dee2e6;
 }
 
 .students-select-list.compact {

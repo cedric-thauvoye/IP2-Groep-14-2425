@@ -27,6 +27,25 @@
                 </button>
             </div>
 
+            <!-- Course Filter (only for teachers) -->
+            <div v-if="isTeacher" class="course-filter">
+                <div class="filter-group">
+                    <label for="courseFilter">
+                        <i class="fas fa-filter"></i>
+                        Filter by Course:
+                    </label>
+                    <select id="courseFilter" v-model="selectedCourseFilter" class="course-filter-select">
+                        <option value="">All Courses</option>
+                        <option v-for="course in availableCourses" :key="course" :value="course">
+                            {{ course }}
+                        </option>
+                    </select>
+                    <span class="filter-count" v-if="selectedCourseFilter">
+                        ({{ filteredAssessmentsCount }} assessment{{ filteredAssessmentsCount !== 1 ? 's' : '' }} shown)
+                    </span>
+                </div>
+            </div>
+
             <div v-if="loading" class="loading-state">
                 <i class="fas fa-spinner fa-spin"></i>
                 <p>Loading assessments...</p>
@@ -59,53 +78,110 @@
                             <div class="group-assessments">
                                 <div v-for="assessment in assessments"
                                      :key="assessment.id"
-                                     class="assessment-card"
+                                     :class="['teacher-assessment-card', { 'completed': activeTab === 'completed' || assessment.completedDate }]"
                                 >
-                                    <div class="assessment-header">
-                                        <h4>{{ assessment.title }}</h4>
-                                        <span class="due-date" v-if="activeTab === 'pending'">
-                                            Due: {{ formatDate(assessment.dueDate) }}
-                                        </span>
-                                        <span class="completion-date" v-else>
-                                            Completed: {{ formatDate(assessment.completedDate) }}
-                                        </span>
-                                    </div>
+                                    <!-- Card status indicator -->
+                                    <div class="card-status-bar" :class="getCardStatusClass(assessment)"></div>
 
-                                    <div class="assessment-content">
-                                        <p>{{ assessment.description }}</p>
-                                        <div class="completion-stats" v-if="!isStudent">
-                                            <div class="stats-row">
-                                                <span>Responses:</span>
-                                                <span class="stat-value">
-                                                    {{ assessment.responsesCount }}/{{ assessment.studentsCount }}
+                                    <!-- Card header with title and status -->
+                                    <div class="card-header">
+                                        <div class="title-section">
+                                            <h4 class="assessment-title">{{ assessment.title }}</h4>
+                                            <div class="assessment-meta">
+                                                <span class="group-badge">
+                                                    <i class="fas fa-users"></i>
+                                                    {{ assessment.groupName }}
                                                 </span>
                                             </div>
-                                            <div class="stats-row">
-                                                <span>With Feedback:</span>
-                                                <span class="stat-value">
-                                                    {{ assessment.feedbackCount }}/{{ assessment.studentsCount }}
-                                                </span>
-                                            </div>
-                                            <div class="progress-bar">
-                                                <div
-                                                    class="progress"
-                                                    :style="{ width: assessment.progress + '%' }"
-                                                ></div>
-                                            </div>
                                         </div>
-                                        <div class="completion-stats" v-else>
-                                            <div class="progress-bar">
-                                                <div class="progress" :style="{ width: assessment.progress + '%' }"></div>
+
+                                        <div class="status-section">
+                                            <!-- Due date or completion info -->
+                                            <div v-if="activeTab === 'pending' && !assessment.completedDate" class="date-info pending">
+                                                <i class="fas fa-clock"></i>
+                                                <div class="date-details">
+                                                    <span class="date-label">Due</span>
+                                                    <span class="date-value">{{ formatDate(assessment.dueDate) }}</span>
+                                                </div>
                                             </div>
-                                            <p class="progress-text">{{ assessment.progress }}% Complete</p>
+
+                                            <div v-else class="date-info completed">
+                                                <i class="fas fa-check-circle"></i>
+                                                <div class="date-details">
+                                                    <span class="date-label">Completed</span>
+                                                    <span class="date-value">{{ formatDate(assessment.completedDate) }}</span>
+                                                </div>
+                                            </div>
+
+                                            <!-- Completion status badge -->
+                                            <div v-if="getCompletionStatus(assessment)"
+                                                 :class="['status-badge', getCompletionStatus(assessment).class]">
+                                                <i class="fas fa-info-circle"></i>
+                                                {{ getCompletionStatus(assessment).text }}
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <div class="assessment-footer">
-                                        <button class="view-button" @click="viewResults(assessment.id)">
-                                            <i class="fas fa-chart-bar"></i>
-                                            View Results
-                                        </button>
+                                    <!-- Card content -->
+                                    <div class="card-content">
+                                        <p class="assessment-description">{{ assessment.description }}</p>
+
+                                        <!-- Progress and statistics -->
+                                        <div class="stats-section">
+                                            <div class="response-stats">
+                                                <div class="stat-item">
+                                                    <div class="stat-icon">
+                                                        <i class="fas fa-users"></i>
+                                                    </div>
+                                                    <div class="stat-details">
+                                                        <span class="stat-label">Responses</span>
+                                                        <span class="stat-value">{{ assessment.responsesCount }}/{{ assessment.studentsCount }}</span>
+                                                    </div>
+                                                </div>
+
+                                                <div class="stat-item">
+                                                    <div class="stat-icon">
+                                                        <i class="fas fa-percentage"></i>
+                                                    </div>
+                                                    <div class="stat-details">
+                                                        <span class="stat-label">Completion</span>
+                                                        <span class="stat-value">{{ Math.round((assessment.responsesCount / assessment.studentsCount) * 100) }}%</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <!-- Progress bar -->
+                                            <div class="progress-container">
+                                                <div class="progress-header">
+                                                    <span class="progress-label">Student Participation</span>
+                                                    <span class="progress-percentage">{{ Math.round((assessment.responsesCount / assessment.studentsCount) * 100) }}%</span>
+                                                </div>
+                                                <div class="progress-bar-modern">
+                                                    <div class="progress-fill"
+                                                         :style="{ width: Math.round((assessment.responsesCount / assessment.studentsCount) * 100) + '%' }"
+                                                         :class="getProgressClass(assessment)">
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Card footer with actions -->
+                                    <div class="card-footer">
+                                        <div class="action-buttons">
+                                            <button class="action-btn primary" @click="viewResults(assessment.id)">
+                                                <i class="fas fa-chart-line"></i>
+                                                <span>View Results</span>
+                                            </button>
+                                        </div>
+
+                                        <!-- Quick stats -->
+                                        <div class="quick-stats">
+                                            <div class="quick-stat" v-if="assessment.feedbackCount">
+                                                <i class="fas fa-comments"></i>
+                                                <span>{{ assessment.feedbackCount }} feedback</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -153,15 +229,6 @@
 
                     <div class="student-assessment-content">
                         <p class="assessment-description">{{ assessment.description }}</p>
-                        <div class="progress-section">
-                            <div class="progress-bar-container">
-                                <div class="progress-bar">
-                                    <div class="progress-fill" :style="{ width: assessment.progress + '%' }"></div>
-                                </div>
-                                <span class="progress-percentage">{{ assessment.progress }}%</span>
-                            </div>
-                            <p class="progress-label">Progress</p>
-                        </div>
                     </div>
 
                     <div class="student-assessment-footer">
@@ -212,16 +279,6 @@
 
                     <div class="student-assessment-content">
                         <p class="assessment-description">{{ assessment.description }}</p>
-                        <!-- Results section removed for students as they should not see scores or time spent -->
-                    </div>
-
-                    <div class="student-assessment-footer">
-                        <div class="submission-summary">
-                            <div class="summary-item">
-                                <i class="fas fa-check-circle"></i>
-                                <span>Assessment Submitted Successfully</span>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -414,6 +471,7 @@ const showCreateModal = ref(false);
 const courses = ref([]);
 const groups = ref([]);
 const isSubmitting = ref(false);
+const selectedCourseFilter = ref('');
 
 const newAssessment = ref({
     title: '',
@@ -443,7 +501,12 @@ const isFormValid = computed(() => {
 });
 
 const formatDate = (date) => {
-    return new Date(date).toLocaleDateString('en-US', {
+    if (!date) return 'N/A';
+
+    const dateObj = new Date(date);
+    if (isNaN(dateObj.getTime())) return 'Invalid Date';
+
+    return dateObj.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric'
@@ -451,7 +514,12 @@ const formatDate = (date) => {
 };
 
 const formatDateTime = (date) => {
-    return new Date(date).toLocaleDateString('en-US', {
+    if (!date) return 'N/A';
+
+    const dateObj = new Date(date);
+    if (isNaN(dateObj.getTime())) return 'Invalid Date';
+
+    return dateObj.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
@@ -512,6 +580,8 @@ const getSubmissionStatusClass = (assessment) => {
     const completed = new Date(assessment.completedDate);
     const due = new Date(assessment.dueDate);
 
+    if (isNaN(completed.getTime()) || isNaN(due.getTime())) return 'on-time';
+
     if (completed > due) return 'late-submission';
     return 'on-time';
 };
@@ -522,8 +592,51 @@ const getSubmissionStatusText = (assessment) => {
     const completed = new Date(assessment.completedDate);
     const due = new Date(assessment.dueDate);
 
+    if (isNaN(completed.getTime()) || isNaN(due.getTime())) return 'On Time';
+
     if (completed > due) return 'Late Submission';
     return 'Submitted On Time';
+};
+
+// Helper function to determine completion reason for teachers
+const getCompletionStatus = (assessment) => {
+    if (!isTeacher.value || !assessment.completedDate) return null;
+
+    const dueDate = new Date(assessment.dueDate);
+    const completedDate = new Date(assessment.completedDate);
+
+    // Check if everyone responded before deadline
+    if (assessment.responsesCount === assessment.studentsCount && completedDate <= dueDate) {
+        return {
+            type: 'all-responded',
+            text: 'All students responded',
+            class: 'status-complete'
+        };
+    }
+
+    // Check if completed due to deadline
+    if (completedDate.getTime() === dueDate.getTime() || Math.abs(completedDate.getTime() - dueDate.getTime()) < 1000) {
+        return {
+            type: 'deadline-reached',
+            text: 'Closed by deadline',
+            class: 'status-deadline'
+        };
+    }
+
+    // Check if all responded after deadline
+    if (assessment.responsesCount === assessment.studentsCount && completedDate > dueDate) {
+        return {
+            type: 'all-responded-late',
+            text: 'All students responded (after deadline)',
+            class: 'status-late'
+        };
+    }
+
+        return {
+        type: 'unknown',
+        text: 'Completed',
+        class: 'status-complete'
+    };
 };
 
 const startAssessment = (id) => {
@@ -532,15 +645,6 @@ const startAssessment = (id) => {
 
 const viewResults = (id) => {
     router.push(`/assessment/${id}/results`);
-};
-
-const loadCourses = async () => {
-    try {
-        const { data } = await courseService.getCourses(true); // Get courses where user is teaching
-        courses.value = data;
-    } catch (error) {
-        console.error('Error loading courses:', error);
-    }
 };
 
 const loadGroups = async () => {
@@ -622,10 +726,6 @@ const toggleAllGroups = () => {
     }
 };
 
-const isStudent = computed(() => {
-    return !isTeacher.value;
-});
-
 // Add new computed properties for organizing assessments
 const organizedAssessments = computed(() => {
     if (!isTeacher.value) return {};
@@ -635,7 +735,9 @@ const organizedAssessments = computed(() => {
 
     // Process pending assessments
     if (activeTab.value === 'pending') {
-        pendingAssessments.value.forEach(assessment => {
+        pendingAssessments.value
+            .filter(assessment => !selectedCourseFilter.value || assessment.courseName === selectedCourseFilter.value)
+            .forEach(assessment => {
             if (!organized[assessment.courseName]) {
                 organized[assessment.courseName] = {
                     groups: {},
@@ -661,7 +763,9 @@ const organizedAssessments = computed(() => {
         });
     } else {
         // Process completed assessments
-        completedAssessments.value.forEach(assessment => {
+        completedAssessments.value
+            .filter(assessment => !selectedCourseFilter.value || assessment.courseName === selectedCourseFilter.value)
+            .forEach(assessment => {
             if (!organized[assessment.courseName]) {
                 organized[assessment.courseName] = {
                     groups: {},
@@ -688,6 +792,20 @@ const organizedAssessments = computed(() => {
     }
 
     return organized;
+});
+
+// Computed property for available courses based on teacher's courses
+const availableCourses = computed(() => {
+    if (!isTeacher.value) return [];
+    return courses.value.map(course => course.name);
+});
+
+// Computed property for filtered assessments count
+const filteredAssessmentsCount = computed(() => {
+    if (!selectedCourseFilter.value) return 0;
+
+    const assessments = activeTab.value === 'pending' ? pendingAssessments.value : completedAssessments.value;
+    return assessments.filter(assessment => assessment.courseName === selectedCourseFilter.value).length;
 });
 
 // Update the onMounted hook
@@ -735,6 +853,32 @@ const openCreateModal = () => {
     });
     showCreateModal.value = true;
     console.log('Modal state after click:', showCreateModal.value);
+};
+
+// Helper functions for card styling
+const getCardStatusClass = (assessment) => {
+    if (activeTab.value === 'completed' || assessment.completedDate) {
+        return 'completed-status';
+    }
+
+    const now = new Date();
+    const due = new Date(assessment.dueDate);
+    const hoursRemaining = (due - now) / (1000 * 60 * 60);
+
+    if (hoursRemaining < 0) return 'overdue-status';
+    if (hoursRemaining < 24) return 'urgent-status';
+    if (hoursRemaining < 72) return 'warning-status';
+    return 'normal-status';
+};
+
+const getProgressClass = (assessment) => {
+    const percentage = Math.round((assessment.responsesCount / assessment.studentsCount) * 100);
+
+    if (percentage >= 100) return 'progress-complete';
+    if (percentage >= 75) return 'progress-high';
+    if (percentage >= 50) return 'progress-medium';
+    if (percentage >= 25) return 'progress-low';
+    return 'progress-none';
 };
 </script>
 
@@ -1124,6 +1268,58 @@ const openCreateModal = () => {
     font-size: 0.8rem;
 }
 
+/* Course Filter Styles */
+.course-filter {
+    margin-bottom: 1.5rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.filter-group label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 600;
+    color: #495057;
+    margin: 0;
+}
+
+.filter-group label i {
+    color: #6c757d;
+}
+
+.course-filter-select {
+    padding: 0.5rem 1rem;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    background: white;
+    font-size: 0.9rem;
+    color: #495057;
+    min-width: 200px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.course-filter-select:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.filter-count {
+    color: #6c757d;
+    font-size: 0.85rem;
+    font-style: italic;
+}
+
 .loading-state, .empty-state {
     display: flex;
     flex-direction: column;
@@ -1136,6 +1332,75 @@ const openCreateModal = () => {
 .loading-state i, .empty-state i {
     font-size: 3rem;
     margin-bottom: 1rem;
+}
+
+/* Teacher Card Specific Styles for Shared Classes */
+.teacher-assessment-card .assessment-description {
+    color: #6c757d;
+    line-height: 1.5;
+    margin: 0 0 1rem 0;
+    font-size: 0.9rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.teacher-assessment-card .progress-bar-modern {
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+}
+
+.teacher-assessment-card .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #007bff, #0056b3);
+    border-radius: 6px;
+    transition: width 0.4s ease;
+}
+
+/* Teacher View Layout - Course and Group Headers */
+.course-header {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #e8ecf1;
+}
+
+.course-header h2 {
+    color: #2c3e50;
+    font-size: 1.5rem;
+    margin: 0;
+    font-weight: 600;
+}
+
+.group-header {
+    margin-bottom: 1rem;
+}
+
+.group-header h3 {
+    color: #34495e;
+    font-size: 1.1rem;
+    margin: 0;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.group-header h3::before {
+    content: "📁";
+    font-size: 0.9rem;
+}
+
+/* Teacher Assessment Cards Grid */
+.group-assessments {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
 }
 
 /* Student Assessments Specific Styles */
@@ -1182,6 +1447,19 @@ const openCreateModal = () => {
     border-left: 4px solid #3498db;
 }
 
+/* Student Assessment Content */
+.student-assessment-card .assessment-description {
+    color: #6c757d;
+    line-height: 1.5;
+    margin: 0 0 1rem 0;
+    font-size: 0.9rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
 .assessment-urgency-indicator {
     position: absolute;
     top: 0;
@@ -1189,56 +1467,67 @@ const openCreateModal = () => {
     width: 0;
     height: 0;
     border-style: solid;
+    z-index: 2;
 }
 
-.overdue-indicator {
-    border-width: 0 30px 30px 0;
+.student-assessment-card .overdue-indicator {
+    border-width: 0 35px 35px 0;
     border-color: transparent #e74c3c transparent transparent;
+    filter: drop-shadow(0 2px 4px rgba(231, 76, 60, 0.3));
 }
 
-.urgent-indicator {
-    border-width: 0 25px 25px 0;
+.student-assessment-card .urgent-indicator {
+    border-width: 0 30px 30px 0;
     border-color: transparent #f39c12 transparent transparent;
+    filter: drop-shadow(0 2px 4px rgba(243, 156, 18, 0.3));
 }
 
-.warning-indicator {
-    border-width: 0 20px 20px 0;
+.student-assessment-card .warning-indicator {
+    border-width: 0 25px 25px 0;
     border-color: transparent #f1c40f transparent transparent;
+    filter: drop-shadow(0 2px 4px rgba(241, 196, 15, 0.3));
 }
 
-.normal-indicator {
-    border-width: 0 15px 15px 0;
+.student-assessment-card .normal-indicator {
+    border-width: 0 20px 20px 0;
     border-color: transparent #27ae60 transparent transparent;
+    filter: drop-shadow(0 2px 4px rgba(39, 174, 96, 0.3));
 }
 
-.assessment-status-badge {
+.student-assessment-card .assessment-status-badge {
     position: absolute;
-    top: 0.6rem;
-    right: 0.6rem;
-    background: #e74c3c;
+    top: 0.75rem;
+    right: 0.75rem;
+    background: linear-gradient(135deg, #e74c3c, #c0392b);
     color: white;
-    padding: 0.2rem 0.6rem;
-    border-radius: 15px;
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
     font-size: 0.75rem;
     font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.3rem;
+    box-shadow: 0 3px 12px rgba(231, 76, 60, 0.3);
+    z-index: 3;
+    border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.completion-badge {
+.student-assessment-card .completion-badge {
     position: absolute;
-    top: 0.6rem;
-    right: 0.6rem;
-    background: #27ae60;
+    top: 0.75rem;
+    right: 0.75rem;
+    background: linear-gradient(135deg, #27ae60, #229954);
     color: white;
-    padding: 0.2rem 0.6rem;
-    border-radius: 15px;
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
     font-size: 0.75rem;
     font-weight: 600;
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.3rem;
+    box-shadow: 0 3px 12px rgba(39, 174, 96, 0.3);
+    z-index: 3;
+    border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .student-assessment-header {
@@ -1267,259 +1556,318 @@ const openCreateModal = () => {
     font-weight: 500;
 }
 
-.due-date-display.overdue {
+.student-assessment-card .due-date-display.overdue {
     color: #e74c3c;
 }
 
-.due-date-display.urgent {
+.student-assessment-card .due-date-display.urgent {
     color: #f39c12;
 }
 
-.due-date-display.warning {
+.student-assessment-card .due-date-display.warning {
     color: #e67e22;
 }
 
-.due-date-display.normal {
+.student-assessment-card .due-date-display.normal {
     color: #27ae60;
 }
 
-.completion-date-display {
+.student-assessment-card .completion-date-display {
     color: #3498db;
 }
 
-.due-label, .completion-label {
+.student-assessment-card .due-label,
+.student-assessment-card .completion-label {
     font-weight: 400;
     color: #6c757d;
 }
 
-.due-date-time, .completion-date-time {
+.student-assessment-card .due-date-time,
+.student-assessment-card .completion-date-time {
     font-weight: 600;
 }
 
-.time-remaining {
+.student-assessment-card .time-remaining {
     font-size: 0.75rem;
     color: #7f8c8d;
     font-style: italic;
 }
 
-.submission-status {
+.student-assessment-card .submission-status {
     font-size: 0.8rem;
-    padding: 0.25rem 0.5rem;
+    padding: 0.2rem 0.5rem;
     border-radius: 12px;
     font-weight: 500;
     align-self: flex-start;
 }
 
-.submission-status.on-time {
+.student-assessment-card .submission-status.on-time {
     background: #d4edda;
     color: #155724;
 }
 
-.submission-status.late-submission {
+.student-assessment-card .submission-status.late-submission {
     background: #f8d7da;
     color: #721c24;
 }
 
-.course-info {
+/* Student Completion status styles */
+.student-assessment-card .completion-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.student-assessment-card .completion-status {
+    font-size: 0.8rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 12px;
+    font-weight: 500;
+    text-align: center;
+}
+
+.student-assessment-card .status-complete {
+    background: #d4edda;
+    color: #155724;
+}
+
+.student-assessment-card .status-deadline {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.student-assessment-card .status-late {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+/* Student Assessment Card Content Styles */
+.student-assessment-card .course-info {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    margin-bottom: 0.75rem;
-    padding: 0.4rem 0.6rem;
-    background: #f8f9fa;
-    border-radius: 6px;
-    color: #6c757d;
-    font-size: 0.85rem;
-}
-
-.student-assessment-content {
     margin-bottom: 1rem;
+    padding: 0.5rem 0.75rem;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-radius: 8px;
+    border-left: 3px solid #007bff;
 }
 
-.assessment-description {
-    color: #5a6c7d;
-    line-height: 1.4;
-    margin-bottom: 0.75rem;
+.student-assessment-card .course-info i {
+    color: #007bff;
     font-size: 0.9rem;
 }
 
-.progress-section {
-    margin-top: 0.75rem;
+.student-assessment-card .course-info span {
+    color: #495057;
+    font-weight: 500;
+    font-size: 0.9rem;
 }
 
-.progress-bar-container {
+.student-assessment-card .student-assessment-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.student-assessment-card .progress-section {
+    background: linear-gradient(135deg, #f8f9fc, #e8ecf1);
+    border-radius: 10px;
+    padding: 1rem;
+    border: 1px solid #e1e8f0;
+}
+
+.student-assessment-card .progress-bar-container {
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.5rem;
 }
 
-.progress-bar {
+.student-assessment-card .progress-bar {
     flex: 1;
-    height: 6px;
+    height: 8px;
     background: #e9ecef;
-    border-radius: 3px;
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+}
+
+.student-assessment-card .progress-bar .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #28a745, #20c997);
+    border-radius: 10px;
+    transition: width 0.4s ease;
+    position: relative;
+}
+
+.student-assessment-card .progress-bar .progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+.student-assessment-card .progress-percentage {
+    font-weight: 700;
+    color: #28a745;
+    font-size: 0.9rem;
+    min-width: 40px;
+    text-align: right;
+}
+
+.student-assessment-card .progress-label {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin: 0;
+    font-weight: 500;
+}
+
+.student-assessment-card .results-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.student-assessment-card .result-item {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: linear-gradient(135deg, #ffffff, #f8f9fc);
+    border-radius: 10px;
+    border: 1px solid #e1e8f0;
+    transition: all 0.2s ease;
+}
+
+.student-assessment-card .result-item:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.student-assessment-card .result-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1rem;
+    flex-shrink: 0;
+}
+
+.student-assessment-card .result-details {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.student-assessment-card .result-label {
+    font-size: 0.75rem;
+    color: #6c757d;
+    margin-bottom: 0.1rem;
+    font-weight: 500;
+}
+
+.student-assessment-card .result-value {
+    font-weight: 700;
+    color: #2c3e50;
+    font-size: 0.9rem;
+}
+
+.student-assessment-card .student-assessment-footer {
+    margin-top: auto;
+    padding-top: 1rem;
+    border-top: 1px solid #e9ecef;
+}
+
+.student-assessment-card .continue-button,
+.student-assessment-card .results-button {
+    width: 100%;
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: white;
+    border: none;
+    padding: 0.875rem 1rem;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+    position: relative;
     overflow: hidden;
 }
 
-.progress-fill {
+.student-assessment-card .continue-button::before,
+.student-assessment-card .results-button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
     height: 100%;
-    background: linear-gradient(90deg, #3498db, #2ecc71);
-    border-radius: 3px;
-    transition: width 0.3s ease;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.6s ease;
 }
 
-.progress-percentage {
-    font-weight: 600;
-    color: #2c3e50;
-    font-size: 0.85rem;
+.student-assessment-card .continue-button:hover::before,
+.student-assessment-card .results-button:hover::before {
+    left: 100%;
 }
 
-.progress-label {
-    font-size: 0.75rem;
-    color: #7f8c8d;
-    margin: 0;
+.student-assessment-card .continue-button:hover:not(:disabled),
+.student-assessment-card .results-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 123, 255, 0.4);
 }
 
-.results-section {
-    display: flex;
-    gap: 0.75rem;
-    margin-top: 0.75rem;
+.student-assessment-card .results-button {
+    background: linear-gradient(135deg, #28a745, #20c997);
 }
 
-.result-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex: 1;
-    padding: 0.6rem;
-    background: #f8f9fa;
-    border-radius: 6px;
+.student-assessment-card .results-button:hover {
+    box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
 }
 
-.result-icon {
-    width: 2rem;
-    height: 2rem;
-    background: #3498db;
-    color: white;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    font-size: 0.8rem;
-}
-
-.result-details {
-    display: flex;
-    flex-direction: column;
-}
-
-.result-label {
-    font-size: 0.75rem;
-    color: #7f8c8d;
-    margin-bottom: 0.1rem;
-}
-
-.result-value {
-    font-weight: 600;
-    color: #2c3e50;
-    font-size: 0.9rem;
-}
-
-.student-assessment-footer {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.continue-button {
-    background: linear-gradient(135deg, #3498db, #2ecc71);
-    color: white;
-    border: none;
-    padding: 0.6rem 1.25rem;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-}
-
-.continue-button:hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
-}
-
-.continue-button:disabled {
-    background: #bdc3c7;
+.student-assessment-card .continue-button:disabled {
+    background: linear-gradient(135deg, #6c757d, #5a6268);
     cursor: not-allowed;
+    opacity: 0.7;
     transform: none;
+    box-shadow: none;
 }
 
-.results-button {
-    background: linear-gradient(135deg, #9b59b6, #3498db);
-    color: white;
-    border: none;
-    padding: 0.6rem 1.25rem;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s ease;
+.student-assessment-card .overdue-notice {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-}
-
-.results-button:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(155, 89, 182, 0.3);
-}
-
-.submission-summary {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-    padding: 1rem;
-    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-    border-radius: 8px;
-    border: 1px solid #e1e5e9;
-}
-
-.summary-item {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    color: #495057;
-    font-size: 0.9rem;
-    font-weight: 500;
-}
-
-.summary-item i {
-    color: #28a745;
-    font-size: 1rem;
-}
-
-.overdue-notice {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    color: #e74c3c;
+    color: #dc3545;
     font-size: 0.85rem;
     font-weight: 500;
-    padding: 0.4rem;
-    background: #fef5f5;
-    border-radius: 4px;
-    border: 1px solid #fadbd8;
+    margin-top: 0.75rem;
+    padding: 0.5rem;
+    background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+    border-radius: 8px;
+    border: 1px solid #f5c6cb;
 }
 
-/* Responsive adjustments for student cards */
+/* Responsive Design for Student Cards */
 @media (max-width: 768px) {
     .student-assessments-grid {
         grid-template-columns: 1fr;
@@ -1530,313 +1878,498 @@ const openCreateModal = () => {
         padding: 1rem;
     }
 
-    .results-section {
-        flex-direction: column;
-        gap: 0.75rem;
+    .student-assessment-card .student-assessment-header h3 {
+        font-size: 1.1rem;
     }
 
-    .due-info, .completion-info {
-        gap: 0.25rem;
+    .student-assessment-card .results-section {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+
+    .student-assessment-card .result-item {
+        padding: 0.5rem;
+    }
+
+    .student-assessment-card .result-icon {
+        width: 2rem;
+        height: 2rem;
+        font-size: 0.8rem;
+    }
+
+    .student-assessment-card .continue-button,
+    .student-assessment-card .results-button {
+        padding: 0.75rem;
+        font-size: 0.85rem;
     }
 }
 
-/* Teacher Assessment Cards (Legacy) */
-.assessments-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 1.5rem;
+/* Modern Teacher Assessment Cards - Clean Design */
+.teacher-assessment-card {
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e1e8ed;
+    transition: box-shadow 0.2s ease;
+    position: relative;
+    overflow: hidden;
+    height: 300px;
+    max-width: 400px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
 }
 
-.assessment-card {
-    background: white;
-    border-radius: 10px;
-    padding: 1.5rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    border: 1px solid #e1e1e1;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+.teacher-assessment-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.assessment-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+.teacher-assessment-card.completed {
+    background: #f8fcf9;
+    border-color: #d4edda;
 }
 
-.assessment-header h4 {
-    margin: 0;
-    color: #2c3e50;
+/* Card Status Bar */
+.card-status-bar {
+    height: 3px;
+    width: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.completed-status {
+    background: #28a745;
+}
+
+.overdue-status {
+    background: #dc3545;
+}
+
+.urgent-status {
+    background: #fd7e14;
+}
+
+.warning-status {
+    background: #ffc107;
+}
+
+.normal-status {
+    background: #007bff;
+}
+
+/* Card Header */
+.card-header {
+    padding: 1.25rem 1.25rem 0.75rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-top: 3px; /* Account for status bar */
+}
+
+.title-section {
+    flex: 1;
+    min-width: 0;
+}
+
+.assessment-title {
     font-size: 1.1rem;
-}
-
-.due-date, .completion-date {
-    font-size: 0.9rem;
-    color: #666;
-}
-
-.teacher-assessments {
-    margin-top: 2rem;
-}
-
-.course-section {
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    margin-bottom: 2rem;
+    font-weight: 600;
+    color: #343a40;
+    margin: 0 0 0.5rem 0;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
 }
 
-.course-header {
-    background-color: #f8f9fa;
-    padding: 1.5rem;
-    border-bottom: 1px solid #e1e1e1;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.course-header h2 {
-    margin: 0;
-    color: #2c3e50;
-    font-size: 1.5rem;
-}
-
-.course-stats {
+.assessment-meta {
     display: flex;
     align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.group-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    background: #f8f9fa;
+    color: #495057;
+    padding: 0.25rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border: 1px solid #dee2e6;
+}
+
+.group-badge i {
+    font-size: 0.7rem;
+}
+
+/* Status Section */
+.status-section {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.5rem;
+    min-width: 110px;
+}
+
+.date-info {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    border: 1px solid;
+}
+
+.date-info.pending {
+    background: #fff3cd;
+    color: #856404;
+    border-color: #ffeaa7;
+}
+
+.date-info.completed {
+    background: #d4edda;
+    color: #155724;
+    border-color: #c3e6cb;
+}
+
+.date-info i {
+    font-size: 0.8rem;
+    flex-shrink: 0;
+}
+
+.date-details {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+}
+
+.date-label {
+    font-size: 0.65rem;
+    opacity: 0.8;
+    margin-bottom: 0.1rem;
+}
+
+.date-value {
+    font-weight: 600;
+    font-size: 0.75rem;
+}
+
+.status-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    text-align: center;
+}
+
+.status-badge.status-complete {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.status-badge.status-deadline {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffeaa7;
+}
+
+.status-badge.status-late {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+/* Card Content */
+.card-content {
+    padding: 0 1.25rem 1rem;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.assessment-description {
+    color: #6c757d;
+    line-height: 1.4;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* Stats Section */
+.stats-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
     gap: 1rem;
 }
 
-.group-count {
-    background-color: #e1e1e1;
-    padding: 0.4rem 0.8rem;
-    border-radius: 20px;
-    font-size: 0.9rem;
-    color: #666;
-}
-
-.groups-container {
-    padding: 1.5rem;
-}
-
-.group-section {
-    background-color: #fff;
-    border-radius: 8px;
-    border: 1px solid #e1e1e1;
-    margin-bottom: 1.5rem;
-}
-
-.group-header {
-    padding: 1rem 1.5rem;
-    border-bottom: 1px solid #e1e1e1;
-    background-color: #f8f9fa;
-}
-
-.group-header h3 {
-    margin: 0;
-    color: #34495e;
-    font-size: 1.2rem;
-}
-
-.group-assessments {
-    padding: 1.5rem;
+.response-stats {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
 }
 
-.completion-stats {
-    margin-top: 1rem;
-}
-
-.stats-row {
+.stat-item {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 0.5rem;
-    color: #666;
-    font-size: 0.9rem;
+    justify-content: flex-start;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+    text-align: left;
+}
+
+.stat-icon {
+    width: 2rem;
+    height: 2rem;
+    background: #007bff;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+}
+
+.stat-details {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    flex: 1;
+}
+
+.stat-label {
+    font-size: 0.7rem;
+    color: #6c757d;
+    margin-bottom: 0.1rem;
+    line-height: 1.2;
 }
 
 .stat-value {
     font-weight: 600;
-    color: #2c3e50;
-}
-
-/* Form Actions */
-.form-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 1rem;
-    margin-top: 2rem;
-}
-
-.cancel-button {
-    padding: 0.75rem 1.5rem;
-    border: 1px solid #e74c3c;
-    background: white;
-    color: #e74c3c;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 500;
-    transition: all 0.2s ease;
-}
-
-.cancel-button:hover {
-    background: #e74c3c;
-    color: white;
-}
-
-.create-button {
-    padding: 0.75rem 1.5rem;
-    border: none;
-    background: #2ecc71;
-    color: white;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 500;
-    transition: all 0.2s ease;
-}
-
-.create-button:hover:not(:disabled) {
-    background: #27ae60;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.create-button:disabled {
-    background: #95a5a6;
-    cursor: not-allowed;
-    opacity: 0.7;
-}
-
-/* Criterion Buttons */
-.add-criterion-button {
-    width: 100%;
-    padding: 0.75rem;
-    background: #3498db;
-    color: white;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    font-weight: 500;
-    transition: all 0.2s ease;
-    margin-top: 1rem;
-}
-
-.add-criterion-button:hover {
-    background: #2980b9;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.add-criterion-button i {
+    color: #343a40;
     font-size: 0.9rem;
+    line-height: 1.2;
 }
 
-.criterion-header {
+/* Progress Container */
+.progress-container {
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 0.75rem;
+    border: 1px solid #e9ecef;
+}
+
+.progress-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
 }
 
-.criterion-header h4 {
-    margin: 0;
-    color: #2c3e50;
-    font-size: 1.1rem;
-}
-
-.remove-button {
-    background: none;
-    border: none;
-    color: #e74c3c;
-    font-size: 1.5rem;
-    cursor: pointer;
-    padding: 0.25rem 0.5rem;
-    line-height: 1;
-    border-radius: 4px;
-    transition: all 0.2s ease;
-}
-
-.remove-button:hover {
-    background: rgba(231, 76, 60, 0.1);
-    transform: scale(1.1);
-}
-
-.hint {
-    color: #7f8c8d;
-    font-size: 0.9rem;
-    margin-bottom: 1.5rem;
-    font-style: italic;
-}
-
-.assessment-footer {
-    margin-top: 1.5rem;
-    text-align: right;
-    display: flex;
-    justify-content: flex-end;
-    gap: 1rem;
-}
-
-.start-button, .view-button {
-    padding: 0.75rem 1.5rem;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    color: white;
+.progress-label {
+    font-size: 0.8rem;
+    color: #6c757d;
     font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    transition: all 0.2s ease;
 }
 
-.start-button {
-    background-color: #3498db;
+.progress-percentage {
+    font-weight: 600;
+    color: #343a40;
+    font-size: 0.85rem;
 }
 
-.start-button:hover {
-    background-color: #2980b9;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.view-button {
-    background-color: #2c3e50;
-    position: relative;
+.progress-bar-modern {
+    height: 6px;
+    background: #e9ecef;
+    border-radius: 3px;
     overflow: hidden;
 }
 
-.view-button:hover {
-    background-color: #34495e;
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.view-button:before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
+.progress-fill {
     height: 100%;
-    background: linear-gradient(
-        120deg,
-        transparent,
-        rgba(255, 255, 255, 0.2),
-        transparent
-    );
-    transition: 0.5s;
+    border-radius: 3px;
+    transition: width 0.3s ease;
 }
 
-.view-button:hover:before {
-    left: 100%;
+.progress-complete {
+    background: #28a745;
 }
 
-.view-button i, .start-button i {
-    font-size: 1rem;
+.progress-high {
+    background: #007bff;
+}
+
+.progress-medium {
+    background: #ffc107;
+}
+
+.progress-low {
+    background: #fd7e14;
+}
+
+.progress-none {
+    background: #dc3545;
+}
+
+/* Card Footer */
+.card-footer {
+    padding: 1rem 1.25rem;
+    background: #f8f9fa;
+    border-top: 1px solid #e9ecef;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-top: auto;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.action-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 4px;
+    font-weight: 500;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.action-btn.primary {
+    background: #007bff;
+    color: white;
+}
+
+.action-btn.primary:hover {
+    background: #0056b3;
+}
+
+.action-btn.secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.action-btn.secondary:hover {
+    background: #545b62;
+}
+
+.action-btn i {
+    font-size: 0.75rem;
+}
+
+.quick-stats {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.quick-stat {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: #6c757d;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.quick-stat i {
+    color: #007bff;
+    font-size: 0.7rem;
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .group-assessments {
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .teacher-assessment-card {
+        height: auto;
+        max-width: 100%;
+    }
+
+    .group-assessments {
+        grid-template-columns: 1fr;
+    }
+
+    .card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding: 1rem;
+    }
+
+    .status-section {
+        align-items: flex-start;
+        width: 100%;
+        flex-direction: row;
+        gap: 0.75rem;
+    }
+
+    .date-info {
+        align-self: flex-start;
+    }
+
+    .response-stats {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+
+    .action-buttons {
+        flex-direction: row;
+        width: 100%;
+        gap: 0.5rem;
+    }
+
+    .action-btn {
+        justify-content: center;
+        flex: 1;
+        font-size: 0.75rem;
+        padding: 0.5rem;
+    }
+
+    .card-footer {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+        padding: 1rem;
+    }
+
+    .quick-stats {
+        justify-content: center;
+    }
 }
 </style>

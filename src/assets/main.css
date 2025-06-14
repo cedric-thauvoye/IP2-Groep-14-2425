@@ -6,3 +6,114 @@
 main {
     transition: margin-left .3s ease;
 }
+
+/* Global Mobile Responsive Utilities */
+
+/* Prevent horizontal scroll on mobile */
+html, body {
+    overflow-x: hidden;
+}
+
+/* Mobile-first responsive breakpoints */
+@media (max-width: 480px) {
+    /* Extra small devices (phones) */
+    .container, .admin-dashboard, .courses-container, .groups-container, 
+    .students-container, .results-container, .import-container {
+        padding: 0.5rem !important;
+    }
+    
+    /* Mobile typography */
+    h1 {
+        font-size: 1.5rem !important;
+    }
+    
+    h2 {
+        font-size: 1.3rem !important;
+    }
+    
+    h3 {
+        font-size: 1.1rem !important;
+    }
+    
+    /* Mobile button spacing */
+    .action-button, .btn, button {
+        margin: 0.2rem 0 !important;
+        padding: 0.6rem 1rem !important;
+        font-size: 0.9rem !important;
+    }
+    
+    /* Mobile table responsiveness */
+    .data-table, table {
+        font-size: 0.8rem !important;
+    }
+    
+    .data-table th, .data-table td, 
+    table th, table td {
+        padding: 0.5rem 0.3rem !important;
+    }
+    
+    /* Mobile form elements */
+    input, select, textarea {
+        font-size: 16px !important; /* Prevent zoom on iOS */
+    }
+}
+
+@media (max-width: 768px) {
+    /* Small devices (tablets) */
+    .container, .admin-dashboard, .courses-container, .groups-container, 
+    .students-container, .results-container, .import-container {
+        padding: 1rem !important;
+    }
+    
+    /* Hide non-essential columns on mobile */
+    .hide-mobile {
+        display: none !important;
+    }
+    
+    /* Stack flex containers on mobile */
+    .mobile-stack {
+        flex-direction: column !important;
+        gap: 1rem !important;
+    }
+    
+    /* Full width on mobile */
+    .mobile-full-width {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+}
+
+/* Touch-friendly interactions */
+@media (hover: none) and (pointer: coarse) {
+    /* Remove hover effects on touch devices */
+    .action-button:hover, .btn:hover, button:hover {
+        background-color: initial !important;
+        transform: none !important;
+    }
+    
+    /* Increase touch targets */
+    .action-button, .btn, button, .nav-pill {
+        min-height: 44px !important;
+        min-width: 44px !important;
+    }
+}
+
+/* Ensure images are responsive */
+img {
+    max-width: 100%;
+    height: auto;
+}
+
+/* Mobile modal adjustments */
+@media (max-width: 768px) {
+    .modal-content {
+        width: 95% !important;
+        max-width: 95% !important;
+        margin: 1rem !important;
+        max-height: 90vh !important;
+    }
+    
+    .modal-body {
+        padding: 1rem !important;
+    }
+}

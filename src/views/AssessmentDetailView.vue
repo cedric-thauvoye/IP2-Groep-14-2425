@@ -164,7 +164,12 @@ const scores = ref({});
 
 // Helper function for date formatting
 const formatDate = (date) => {
-    return new Date(date).toLocaleDateString('en-US', {
+    if (!date) return 'N/A';
+
+    const dateObj = new Date(date);
+    if (isNaN(dateObj.getTime())) return 'Invalid Date';
+
+    return dateObj.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',

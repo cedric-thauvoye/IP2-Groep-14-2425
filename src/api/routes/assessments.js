@@ -57,7 +57,15 @@ module.exports = (pool) => {
                  g.name as groupName,
                  (SELECT COUNT(r.id) FROM responses r WHERE r.assessment_id = a.id AND r.submitted_at IS NOT NULL) as responses_count,
                  (SELECT COUNT(gs.id) FROM group_students gs WHERE gs.group_id = a.group_id) as students_count,
-                 (SELECT COUNT(r.id) FROM responses r WHERE r.assessment_id = a.id AND r.submitted_at IS NOT NULL AND r.feedback IS NOT NULL AND r.feedback != '') as feedback_count
+                 (SELECT COUNT(r.id) FROM responses r WHERE r.assessment_id = a.id AND r.submitted_at IS NOT NULL AND r.feedback IS NOT NULL AND r.feedback != '') as feedback_count,
+                 CASE
+                   WHEN (SELECT COUNT(r.id) FROM responses r WHERE r.assessment_id = a.id AND r.submitted_at IS NOT NULL) =
+                        (SELECT COUNT(gs.id) FROM group_students gs WHERE gs.group_id = a.group_id)
+                   THEN (SELECT MAX(r.submitted_at) FROM responses r WHERE r.assessment_id = a.id AND r.submitted_at IS NOT NULL)
+                   WHEN a.due_date < NOW()
+                   THEN a.due_date
+                   ELSE NULL
+                 END as completion_date
           FROM assessments a
           JOIN courses c ON a.course_id = c.id
           JOIN groups g ON a.group_id = g.id
@@ -95,6 +103,7 @@ module.exports = (pool) => {
             groupName: row.groupName,
             description: row.description,
             dueDate: row.due_date,
+            completedDate: row.completion_date,
             responsesCount: row.responses_count,
             studentsCount: row.students_count,
             feedbackCount: row.feedback_count || 0,
@@ -141,7 +150,13 @@ module.exports = (pool) => {
                  g.name as groupName, a.due_date,
                  (SELECT COUNT(r.id) FROM responses r WHERE r.assessment_id = a.id AND r.submitted_at IS NOT NULL) as responses_count,
                  (SELECT COUNT(gs.id) FROM group_students gs WHERE gs.group_id = a.group_id) as students_count,
-                 (SELECT COUNT(r.id) FROM responses r WHERE r.assessment_id = a.id AND r.submitted_at IS NOT NULL AND r.feedback IS NOT NULL AND r.feedback != '') as feedback_count
+                 (SELECT COUNT(r.id) FROM responses r WHERE r.assessment_id = a.id AND r.submitted_at IS NOT NULL AND r.feedback IS NOT NULL AND r.feedback != '') as feedback_count,
+                 CASE
+                   WHEN (SELECT COUNT(r.id) FROM responses r WHERE r.assessment_id = a.id AND r.submitted_at IS NOT NULL) =
+                        (SELECT COUNT(gs.id) FROM group_students gs WHERE gs.group_id = a.group_id)
+                   THEN (SELECT MAX(r.submitted_at) FROM responses r WHERE r.assessment_id = a.id AND r.submitted_at IS NOT NULL)
+                   ELSE a.due_date
+                 END as completed_date
           FROM assessments a
           JOIN courses c ON a.course_id = c.id
           JOIN groups g ON a.group_id = g.id
@@ -181,6 +196,7 @@ module.exports = (pool) => {
             groupName: row.groupName,
             description: row.description,
             dueDate: row.due_date,
+            completedDate: row.completed_date,
             responsesCount: row.responses_count,
             studentsCount: row.students_count,
             feedbackCount: row.feedback_count || 0,

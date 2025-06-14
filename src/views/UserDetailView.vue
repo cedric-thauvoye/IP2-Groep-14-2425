@@ -38,10 +38,10 @@
             </div>
           </div>
           <div class="action-buttons" v-if="isAdmin">
-            <button class="edit-button" @click="showEditModal = true">
+            <button class="edit-button" @click="openEditModal">
               <i class="fas fa-edit"></i> Edit User
             </button>
-            <button class="reset-password-button" @click="showResetPasswordModal = true">
+            <button class="reset-password-button" @click="openResetPasswordModal">
               <i class="fas fa-key"></i> Reset Password
             </button>
             <button class="delete-button" @click="confirmDeleteUser">
@@ -151,66 +151,97 @@
       </template>
 
       <!-- Edit User Modal -->
-      <div v-if="showEditModal" class="modal-overlay">
-        <div class="modal-content">
+      <div v-if="showEditModal" class="modal-overlay" @click.self="showEditModal = false">
+        <div class="modal-content edit-modal">
           <div class="modal-header">
-            <h2>Edit User</h2>
+            <h2><i class="fas fa-user-edit"></i> Edit User</h2>
             <button class="close-button" @click="showEditModal = false">
               <i class="fas fa-times"></i>
             </button>
           </div>
           <div class="modal-body">
             <form @submit.prevent="updateUser">
-              <div class="form-group">
-                <label for="first-name">First Name</label>
-                <input
-                  type="text"
-                  id="first-name"
-                  v-model="editForm.first_name"
-                  required
-                >
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="first-name">
+                    <i class="fas fa-user"></i> First Name
+                  </label>
+                  <input
+                    type="text"
+                    id="first-name"
+                    v-model="editForm.first_name"
+                    :class="{ 'error': editErrors.first_name }"
+                    required
+                    placeholder="Enter first name"
+                  >
+                  <span v-if="editErrors.first_name" class="error-message">{{ editErrors.first_name }}</span>
+                </div>
+                <div class="form-group">
+                  <label for="last-name">
+                    <i class="fas fa-user"></i> Last Name
+                  </label>
+                  <input
+                    type="text"
+                    id="last-name"
+                    v-model="editForm.last_name"
+                    :class="{ 'error': editErrors.last_name }"
+                    required
+                    placeholder="Enter last name"
+                  >
+                  <span v-if="editErrors.last_name" class="error-message">{{ editErrors.last_name }}</span>
+                </div>
               </div>
+
               <div class="form-group">
-                <label for="last-name">Last Name</label>
-                <input
-                  type="text"
-                  id="last-name"
-                  v-model="editForm.last_name"
-                  required
-                >
-              </div>
-              <div class="form-group">
-                <label for="email">Email</label>
+                <label for="email">
+                  <i class="fas fa-envelope"></i> Email Address
+                </label>
                 <input
                   type="email"
                   id="email"
                   v-model="editForm.email"
+                  :class="{ 'error': editErrors.email }"
                   required
+                  placeholder="Enter email address"
                 >
+                <span v-if="editErrors.email" class="error-message">{{ editErrors.email }}</span>
               </div>
-              <div class="form-group">
-                <label for="role">Role</label>
-                <select id="role" v-model="editForm.role" required>
-                  <option value="student">Student</option>
-                  <option value="teacher">Teacher</option>
-                  <option value="admin">Admin</option>
-                </select>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="role">
+                    <i class="fas fa-user-tag"></i> Role
+                  </label>
+                  <select id="role" v-model="editForm.role" required>
+                    <option value="">Select role</option>
+                    <option value="student">Student</option>
+                    <option value="teacher">Teacher</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                <div v-if="editForm.role === 'student'" class="form-group">
+                  <label for="q-number">
+                    <i class="fas fa-id-card"></i> Q-Number
+                  </label>
+                  <input
+                    type="text"
+                    id="q-number"
+                    v-model="editForm.q_number"
+                    :class="{ 'error': editErrors.q_number }"
+                    required
+                    placeholder="Enter Q-number"
+                  >
+                  <span v-if="editErrors.q_number" class="error-message">{{ editErrors.q_number }}</span>
+                </div>
               </div>
-              <div v-if="editForm.role === 'student'" class="form-group">
-                <label for="q-number">Q-Number</label>
-                <input
-                  type="text"
-                  id="q-number"
-                  v-model="editForm.q_number"
-                  required
-                >
-              </div>
+
               <div class="form-actions">
                 <button type="button" class="cancel-button" @click="showEditModal = false">
-                  Cancel
+                  <i class="fas fa-times"></i> Cancel
                 </button>
-                <button type="submit" class="submit-button">
-                  Save Changes
+                <button type="submit" class="submit-button" :disabled="isUpdating">
+                  <i class="fas fa-save"></i>
+                  {{ isUpdating ? 'Saving...' : 'Save Changes' }}
                 </button>
               </div>
             </form>
@@ -219,54 +250,88 @@
       </div>
 
       <!-- Reset Password Modal -->
-      <div v-if="showResetPasswordModal" class="modal-overlay">
-        <div class="modal-content">
+      <div v-if="showResetPasswordModal" class="modal-overlay" @click.self="showResetPasswordModal = false">
+        <div class="modal-content reset-password-modal">
           <div class="modal-header">
-            <h2>Reset Password</h2>
+            <h2><i class="fas fa-key"></i> Reset Password</h2>
             <button class="close-button" @click="showResetPasswordModal = false">
               <i class="fas fa-times"></i>
             </button>
           </div>
           <div class="modal-body">
+            <div class="reset-info">
+              <p>Resetting password for: <strong>{{ user.first_name }} {{ user.last_name }}</strong></p>
+              <p class="security-notice">
+                <i class="fas fa-shield-alt"></i>
+                This action requires your admin password for security verification.
+              </p>
+            </div>
+
             <form @submit.prevent="resetPassword">
-              <div class="form-group">
-                <label for="new-password">New Password</label>
-                <input
-                  type="password"
-                  id="new-password"
-                  v-model="passwordForm.password"
-                  required
-                  minlength="8"
-                >
+              <div class="password-section">
+                <div class="form-group">
+                  <label for="new-password">
+                    <i class="fas fa-lock"></i> New Password
+                  </label>
+                  <input
+                    type="password"
+                    id="new-password"
+                    v-model="passwordForm.password"
+                    :class="{ 'error': passwordErrors.password }"
+                    required
+                    minlength="8"
+                    placeholder="Enter new password (min 8 characters)"
+                  >
+                  <span v-if="passwordErrors.password" class="error-message">{{ passwordErrors.password }}</span>
+                </div>
+
+                <div class="form-group">
+                  <label for="confirm-password">
+                    <i class="fas fa-lock"></i> Confirm Password
+                  </label>
+                  <input
+                    type="password"
+                    id="confirm-password"
+                    v-model="passwordForm.confirmPassword"
+                    :class="{ 'error': passwordMismatch || passwordErrors.confirmPassword }"
+                    required
+                    placeholder="Confirm new password"
+                  >
+                  <span v-if="passwordMismatch" class="error-message">
+                    Passwords do not match
+                  </span>
+                  <span v-else-if="passwordForm.password && passwordForm.confirmPassword && !passwordMismatch" class="success-message">
+                    <i class="fas fa-check"></i> Passwords match
+                  </span>
+                </div>
               </div>
-              <div class="form-group">
-                <label for="confirm-password">Confirm Password</label>
-                <input
-                  type="password"
-                  id="confirm-password"
-                  v-model="passwordForm.confirmPassword"
-                  required
-                >
-                <p v-if="passwordMismatch" class="error-message">
-                  Passwords do not match
-                </p>
-              </div>
+
               <div class="security-verification">
-                <label for="admin-password">Your Admin Password</label>
+                <label for="admin-password">
+                  <i class="fas fa-shield-alt"></i> Your Admin Password
+                </label>
                 <input
                   type="password"
                   id="admin-password"
                   v-model="passwordForm.adminPassword"
+                  :class="{ 'error': passwordErrors.adminPassword }"
                   placeholder="Enter your password to confirm"
                   required
                 >
+                <span v-if="passwordErrors.adminPassword" class="error-message">{{ passwordErrors.adminPassword }}</span>
               </div>
+
               <div class="form-actions">
                 <button type="button" class="cancel-button" @click="showResetPasswordModal = false">
-                  Cancel
+                  <i class="fas fa-times"></i> Cancel
                 </button>
-                <button type="submit" class="submit-button" :disabled="passwordMismatch">
-                  Reset Password
+                <button
+                  type="submit"
+                  class="submit-button reset-btn"
+                  :disabled="passwordMismatch || isResettingPassword"
+                >
+                  <i class="fas fa-key"></i>
+                  {{ isResettingPassword ? 'Resetting...' : 'Reset Password' }}
                 </button>
               </div>
             </form>
@@ -324,6 +389,7 @@ import { useRouter, useRoute } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
 import { userService, authService, courseService } from '../services/api';
 import { useBackNavigation } from '../composables/useBackNavigation';
+import notificationStore from '../stores/notificationStore';
 
 const router = useRouter();
 const route = useRoute();
@@ -355,6 +421,14 @@ const passwordForm = ref({
 
 const deletePassword = ref('');
 
+// Loading states
+const isUpdating = ref(false);
+const isResettingPassword = ref(false);
+
+// Error states
+const editErrors = ref({});
+const passwordErrors = ref({});
+
 const passwordMismatch = computed(() => {
   return passwordForm.value.password &&
          passwordForm.value.confirmPassword &&
@@ -385,24 +459,93 @@ const initEditForm = () => {
     role: user.value.role,
     q_number: user.value.q_number || ''
   };
+  // Clear any previous errors
+  editErrors.value = {};
+};
+
+// Clear password form
+const clearPasswordForm = () => {
+  passwordForm.value = {
+    password: '',
+    confirmPassword: '',
+    adminPassword: ''
+  };
+  passwordErrors.value = {};
+};
+
+// Validate edit form
+const validateEditForm = () => {
+  const errors = {};
+
+  if (!editForm.value.first_name?.trim()) {
+    errors.first_name = 'First name is required';
+  }
+
+  if (!editForm.value.last_name?.trim()) {
+    errors.last_name = 'Last name is required';
+  }
+
+  if (!editForm.value.email?.trim()) {
+    errors.email = 'Email is required';
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editForm.value.email)) {
+    errors.email = 'Please enter a valid email address';
+  }
+
+  if (editForm.value.role === 'student' && !editForm.value.q_number?.trim()) {
+    errors.q_number = 'Q-number is required for students';
+  }
+
+  editErrors.value = errors;
+  return Object.keys(errors).length === 0;
+};
+
+// Validate password form
+const validatePasswordForm = () => {
+  const errors = {};
+
+  if (!passwordForm.value.password) {
+    errors.password = 'New password is required';
+  } else if (passwordForm.value.password.length < 8) {
+    errors.password = 'Password must be at least 8 characters long';
+  }
+
+  if (!passwordForm.value.adminPassword) {
+    errors.adminPassword = 'Admin password is required for verification';
+  }
+
+  passwordErrors.value = errors;
+  return Object.keys(errors).length === 0;
 };
 
 // Update user
 const updateUser = async () => {
+  if (!validateEditForm()) {
+    return;
+  }
+
+  isUpdating.value = true;
+
   try {
     await userService.updateUser(user.value.id, {
-      first_name: editForm.value.first_name,
-      last_name: editForm.value.last_name,
-      email: editForm.value.email,
+      first_name: editForm.value.first_name.trim(),
+      last_name: editForm.value.last_name.trim(),
+      email: editForm.value.email.trim(),
       role: editForm.value.role,
-      q_number: editForm.value.role === 'student' ? editForm.value.q_number : null
+      q_number: editForm.value.role === 'student' ? editForm.value.q_number.trim() : null
     });
 
     showEditModal.value = false;
-    fetchUserDetails();
+    notificationStore.success('User updated successfully!');
+    await fetchUserDetails();
   } catch (err) {
     console.error('Error updating user:', err);
-    error.value = 'Failed to update user. Please try again.';
+    if (err.response?.data?.message) {
+      notificationStore.error(err.response.data.message);
+    } else {
+      notificationStore.error('Failed to update user. Please try again.');
+    }
+  } finally {
+    isUpdating.value = false;
   }
 };
 
@@ -412,11 +555,18 @@ const resetPassword = async () => {
     return;
   }
 
+  if (!validatePasswordForm()) {
+    return;
+  }
+
+  isResettingPassword.value = true;
+
   try {
     // First verify admin password
     const verification = await authService.verifyPassword(passwordForm.value.adminPassword);
     if (!verification.data.valid) {
-      notificationStore.error('Incorrect password. Password reset cancelled.');
+      passwordErrors.value.adminPassword = 'Incorrect admin password';
+      notificationStore.error('Incorrect admin password. Password reset cancelled.');
       return;
     }
 
@@ -426,15 +576,28 @@ const resetPassword = async () => {
 
     notificationStore.success('Password has been reset successfully.');
     showResetPasswordModal.value = false;
-    passwordForm.value = {
-      password: '',
-      confirmPassword: '',
-      adminPassword: ''
-    };
+    clearPasswordForm();
   } catch (err) {
     console.error('Error resetting password:', err);
-    error.value = 'Failed to reset password. Please try again.';
+    if (err.response?.data?.message) {
+      notificationStore.error(err.response.data.message);
+    } else {
+      notificationStore.error('Failed to reset password. Please try again.');
+    }
+  } finally {
+    isResettingPassword.value = false;
   }
+};
+
+// Modal control functions
+const openEditModal = () => {
+  initEditForm();
+  showEditModal.value = true;
+};
+
+const openResetPasswordModal = () => {
+  clearPasswordForm();
+  showResetPasswordModal.value = true;
 };
 
 // Confirm user deletion
@@ -445,20 +608,29 @@ const confirmDeleteUser = () => {
 
 // Delete user
 const deleteUser = async () => {
+  if (!deletePassword.value) {
+    notificationStore.error('Admin password is required for deletion');
+    return;
+  }
+
   try {
     // Verify admin password first
     const verification = await authService.verifyPassword(deletePassword.value);
     if (!verification.data.valid) {
-      notificationStore.error('Incorrect password. Delete operation cancelled.');
+      notificationStore.error('Incorrect admin password. Delete operation cancelled.');
       return;
     }
 
     await userService.deleteUser(user.value.id);
-    notificationStore.success('User has been deleted successfully.');
+    notificationStore.success(`User "${user.value.first_name} ${user.value.last_name}" has been deleted successfully.`);
     router.push('/admin');
   } catch (err) {
     console.error('Error deleting user:', err);
-    error.value = 'Failed to delete user. Please try again.';
+    if (err.response?.data?.message) {
+      notificationStore.error(err.response.data.message);
+    } else {
+      notificationStore.error('Failed to delete user. Please try again.');
+    }
   }
 };
 
@@ -652,33 +824,56 @@ onMounted(async () => {
 
 .action-buttons {
   display: flex;
-  gap: 1rem;
+  gap: 0.75rem;
   margin-top: 1rem;
+  flex-wrap: wrap;
 }
 
 .edit-button, .reset-password-button, .delete-button {
   border: none;
-  padding: 0.75rem 1.5rem;
+  padding: 0.75rem 1.25rem;
   border-radius: 8px;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .edit-button {
-  background-color: #f39c12;
+  background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
   color: white;
+}
+
+.edit-button:hover {
+  background: linear-gradient(135deg, #e67e22 0%, #d35400 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(243, 156, 18, 0.3);
 }
 
 .reset-password-button {
-  background-color: #3498db;
+  background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
   color: white;
 }
 
+.reset-password-button:hover {
+  background: linear-gradient(135deg, #2980b9 0%, #2471a3 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+}
+
 .delete-button {
-  background-color: #e74c3c;
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
   color: white;
+}
+
+.delete-button:hover {
+  background: linear-gradient(135deg, #c0392b 0%, #a93226 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
 }
 
 .info-grid {
@@ -822,28 +1017,52 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  backdrop-filter: blur(4px);
+  transition: all 0.3s ease;
 }
 
 .modal-content {
   background: white;
-  border-radius: 10px;
+  border-radius: 12px;
   width: 500px;
   max-width: 90%;
   max-height: 90vh;
   overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  transform: translateY(0);
+  transition: all 0.3s ease;
+}
+
+.edit-modal {
+  width: 600px;
+}
+
+.reset-password-modal {
+  width: 550px;
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 1.5rem;
-  border-bottom: 1px solid #eee;
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid #e5e7eb;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-radius: 12px 12px 0 0;
 }
 
 .modal-header h2 {
   margin: 0;
-  font-size: 1.2rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.modal-header h2 i {
+  color: #3b82f6;
 }
 
 .close-button {
@@ -851,12 +1070,193 @@ onMounted(async () => {
   border: none;
   font-size: 1.2rem;
   cursor: pointer;
-  color: #7f8c8d;
-  transition: color 0.2s;
+  color: #6b7280;
+  transition: all 0.2s ease;
+  padding: 0.5rem;
+  border-radius: 6px;
 }
 
 .close-button:hover {
-  color: #e74c3c;
+  color: #dc2626;
+  background: #fef2f2;
+}
+
+.modal-body {
+  padding: 2rem;
+}
+
+/* Enhanced Form Styles */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #374151;
+  font-weight: 500;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.form-group label i {
+  color: #6b7280;
+  width: 14px;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: all 0.2s ease;
+  background: white;
+  box-sizing: border-box;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  outline: none;
+}
+
+.form-group input.error {
+  border-color: #dc2626;
+  background: #fef2f2;
+}
+
+.form-group input.error:focus {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.1);
+}
+
+.error-message {
+  color: #dc2626;
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.success-message {
+  color: #059669;
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.reset-info {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.reset-info p {
+  margin: 0 0 0.5rem 0;
+  color: #0f172a;
+}
+
+.reset-info p:last-child {
+  margin-bottom: 0;
+}
+
+.security-notice {
+  color: #0369a1 !important;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.security-notice i {
+  color: #0284c7;
+}
+
+.password-section {
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid #e5e7eb;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.cancel-button,
+.submit-button {
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: none;
+}
+
+.cancel-button {
+  background: white;
+  border: 2px solid #d1d5db;
+  color: #374151;
+}
+
+.cancel-button:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.submit-button {
+  background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+  color: white;
+  border: 2px solid transparent;
+}
+
+.submit-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #e67e22 0%, #d35400 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(243, 156, 18, 0.3);
+}
+
+.submit-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.submit-button.reset-btn {
+  background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+}
+
+.submit-button.reset-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2980b9 0%, #2471a3 100%);
+  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
 }
 
 /* Confirmation modal styles */
@@ -892,34 +1292,37 @@ onMounted(async () => {
 }
 
 .security-verification {
-  background: #f8f9fa;
+  background: #fef3c7;
+  border: 1px solid #fbbf24;
   padding: 1.5rem;
   border-radius: 8px;
-  text-align: left;
-  display: flex;
-  flex-direction: column;
+  margin-top: 1rem;
 }
 
 .security-verification label {
   display: block;
   margin-bottom: 0.75rem;
-  color: #2c3e50;
-  font-weight: 500;
+  color: #92400e;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .security-verification input {
-  width: calc(100% - 1.5rem);
+  width: 100%;
   padding: 0.75rem;
-  border: 1px solid #ddd;
+  border: 2px solid #f59e0b;
   border-radius: 6px;
   font-size: 1rem;
   transition: all 0.2s ease;
-  margin: 0 auto;
+  background: white;
+  box-sizing: border-box;
 }
 
 .security-verification input:focus {
-  border-color: #3498db;
-  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.1);
+  border-color: #d97706;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
   outline: none;
 }
 
@@ -989,6 +1392,57 @@ onMounted(async () => {
 
   .courses-list, .groups-list {
     grid-template-columns: 1fr;
+  }
+
+  .modal-content {
+    width: 95%;
+    margin: 1rem;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .modal-header {
+    padding: 1rem 1.5rem;
+  }
+
+  .modal-body {
+    padding: 1.5rem;
+  }
+
+  .form-actions {
+    flex-direction: column-reverse;
+    gap: 0.75rem;
+  }
+
+  .submit-button, .cancel-button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .user-profile {
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem;
+  }
+
+  .user-details {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-content {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    max-height: none;
+  }
+
+  .modal-overlay {
+    padding: 0;
   }
 }
 </style>

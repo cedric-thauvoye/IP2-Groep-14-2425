@@ -245,6 +245,25 @@ onMounted(async () => {
     font-size: 2rem;
 }
 
+/* Mobile responsiveness for welcome section */
+@media (max-width: 768px) {
+    .welcome-section h1 {
+        font-size: 1.6rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .welcome-section {
+        margin-bottom: 1.5rem;
+        text-align: center;
+    }
+
+    .welcome-section h1 {
+        font-size: 1.4rem;
+        line-height: 1.3;
+    }
+}
+
 .subtitle {
     color: #7f8c8d;
     margin-top: 0.5rem;
@@ -257,6 +276,22 @@ onMounted(async () => {
     margin-bottom: 2rem;
 }
 
+/* Mobile responsiveness for stats grid */
+@media (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+        gap: 0.8rem;
+    }
+}
+
 .stat-card {
     background: white;
     padding: 1.5rem;
@@ -265,6 +300,23 @@ onMounted(async () => {
     display: flex;
     align-items: center;
     gap: 1rem;
+}
+
+/* Mobile responsiveness for stat cards */
+@media (max-width: 768px) {
+    .stat-card {
+        padding: 1.2rem;
+        gap: 0.8rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .stat-card {
+        padding: 1rem;
+        gap: 0.8rem;
+        flex-direction: row;
+        text-align: left;
+    }
 }
 
 .stat-card i {
@@ -326,6 +378,21 @@ onMounted(async () => {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 1rem;
+}
+
+/* Mobile responsiveness for courses grid */
+@media (max-width: 768px) {
+    .courses-grid {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 0.8rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .courses-grid {
+        grid-template-columns: 1fr;
+        gap: 0.8rem;
+    }
 }
 
 .course-item {

@@ -858,6 +858,21 @@ export default {
     flex-wrap: wrap;
 }
 
+/* Mobile responsiveness for import type cards */
+@media (max-width: 768px) {
+    .import-type-cards {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .import-type-cards {
+        gap: 0.8rem;
+    }
+}
+
 .import-type-card {
     background: white;
     border: 2px solid #ecf0f1;
@@ -868,6 +883,31 @@ export default {
     min-width: 250px;
     text-align: center;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Mobile responsiveness for import type card */
+@media (max-width: 768px) {
+    .import-type-card {
+        min-width: 200px;
+        max-width: 100%;
+        padding: 1.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .import-type-card {
+        min-width: auto;
+        width: 100%;
+        padding: 1.2rem;
+    }
+
+    .import-type-card i {
+        font-size: 2.5rem !important;
+    }
+
+    .import-type-card h3 {
+        font-size: 1.1rem !important;
+    }
 }
 
 .import-type-card:hover {
