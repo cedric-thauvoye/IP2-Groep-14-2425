@@ -88,6 +88,13 @@ module.exports = (pool, jwt, bcrypt) => {
 
       const { email, password, firstName, lastName, role = 'student' } = req.body;
 
+      // Prevent student self-registration - students must be added by teachers/admins
+      if (role === 'student') {
+        return res.status(403).json({
+          message: 'Student registration is not allowed. Students must be added by teachers or administrators.'
+        });
+      }
+
       // Validate input
       if (!email || !password || !firstName || !lastName) {
         return res.status(400).json({ message: 'All fields are required' });
@@ -174,37 +181,30 @@ module.exports = (pool, jwt, bcrypt) => {
       let user;
 
       if (rows.length === 0) {
-        // Create new user based on Microsoft data
-        const firstName = microsoftUser.givenName || '';
-        const lastName = microsoftUser.surname || '';
-
-        // Determine if student or teacher based on email domain
+        // Determine role based on email domain first
         const role = email.toLowerCase().includes('student') ? 'student' : 'teacher';
 
-        // Generate a q_number for students to satisfy the constraint
-        // For emails like student@student.odisee.be, extract username as q-number
-        // If not possible, create a placeholder q-number
-        let qNumber = null;
+        // Students cannot create accounts through Microsoft auth - they must be added by teachers/admins
         if (role === 'student') {
-          // Try to extract q-number from email or generate one
-          const emailParts = email.split('@');
-          if (emailParts.length > 0 && emailParts[0].toLowerCase().startsWith('q')) {
-            qNumber = emailParts[0];
-          } else {
-            // Create a placeholder q-number using timestamp
-            qNumber = `q${Date.now().toString().substring(7)}`;
-          }
+          conn.release();
+          return res.status(403).json({
+            message: 'Student account not found. Please contact your teacher or administrator to be added to the system.'
+          });
         }
+
+        // Only allow automatic account creation for teachers/staff
+        const firstName = microsoftUser.givenName || '';
+        const lastName = microsoftUser.surname || '';
 
         // Generate a random password (not needed for Microsoft users, but required in our schema)
         const randomPassword = Math.random().toString(36).slice(-12);
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(randomPassword, salt);
 
-        // Create the user - include q_number for students
+        // Create the user - only for teachers (no q_number needed for teachers)
         const [result] = await conn.execute(
           'INSERT INTO users (email, password, first_name, last_name, role, q_number) VALUES (?, ?, ?, ?, ?, ?)',
-          [email, hashedPassword, firstName, lastName, role, qNumber]
+          [email, hashedPassword, firstName, lastName, role, null]
         );
 
         [rows] = await conn.execute('SELECT * FROM users WHERE id = ?', [result.insertId]);
