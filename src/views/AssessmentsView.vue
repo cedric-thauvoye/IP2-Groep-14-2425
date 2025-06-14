@@ -506,7 +506,7 @@ const formatDate = (date) => {
     const dateObj = new Date(date);
     if (isNaN(dateObj.getTime())) return 'Invalid Date';
 
-    return dateObj.toLocaleDateString('en-US', {
+    return dateObj.toLocaleDateString('en-GB', {
         year: 'numeric',
         month: 'short',
         day: 'numeric'
@@ -519,7 +519,7 @@ const formatDateTime = (date) => {
     const dateObj = new Date(date);
     if (isNaN(dateObj.getTime())) return 'Invalid Date';
 
-    return dateObj.toLocaleDateString('en-US', {
+    return dateObj.toLocaleDateString('en-GB', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
