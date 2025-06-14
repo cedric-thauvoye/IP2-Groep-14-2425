@@ -1914,11 +1914,14 @@ const getProgressClass = (assessment) => {
     transition: box-shadow 0.2s ease;
     position: relative;
     overflow: hidden;
-    height: 300px;
-    max-width: 400px;
+    min-height: 300px;
+    height: auto;
+    max-width: 480px;
+    min-width: 360px;
     width: 100%;
     display: flex;
     flex-direction: column;
+    margin-bottom: 1.5rem;
 }
 
 .teacher-assessment-card:hover {
@@ -2123,9 +2126,9 @@ const getProgressClass = (assessment) => {
 }
 
 .response-stats {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
     gap: 0.75rem;
+    flex-wrap: wrap;
 }
 
 .stat-item {
@@ -2138,6 +2141,9 @@ const getProgressClass = (assessment) => {
     border-radius: 6px;
     border: 1px solid #e9ecef;
     text-align: left;
+    flex: 1;
+    min-width: 0;
+    max-width: 180px;
 }
 
 .stat-icon {
