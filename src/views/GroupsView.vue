@@ -7,9 +7,9 @@
           <button class="action-button" @click="showCreateGroupModal = true">
             <i class="fas fa-plus"></i> Create Group
           </button>
-          <button class="action-button import">
+          <router-link to="/import" class="action-button import">
             <i class="fas fa-file-import"></i> Import Groups
-          </button>
+          </router-link>
         </div>
       </div>
 
@@ -577,6 +577,7 @@ onMounted(async () => {
 
 .action-button.import {
   background-color: #2c3e50;
+  text-decoration: none;
 }
 
 .action-button:hover {
