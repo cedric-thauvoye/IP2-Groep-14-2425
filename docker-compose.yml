@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+    # API Server
+    api:
+        build:
+            context: ./src/api
+            dockerfile: Dockerfile
+        container_name: peer-evaluation-api
+        restart: unless-stopped
+        env_file:
+            - .env
+        ports:
+            - '${API_PORT:-3000}:3000'
+        volumes:
+            - ./src/api:/app
+            - /app/node_modules
+        depends_on:
+            - db
+        networks:
+            - app-network
+
+    # Vue.js Frontend
+    app:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        container_name: peer-evaluation-app
+        restart: unless-stopped
+        depends_on:
+            - api
+        env_file:
+            - .env
+        ports:
+            - '${APP_PORT:-5173}:5173'
+        volumes:
+            - .:/app
+            - /app/node_modules
+        networks:
+            - app-network
+
+    # MariaDB Database
+    db:
+        build:
+            context: ./database
+            dockerfile: Dockerfile
+        container_name: peer-evaluation-db
+        restart: unless-stopped
+        env_file:
+            - .env
+        environment:
+            MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+            MYSQL_DATABASE: ${MYSQL_DATABASE}
+            MYSQL_USER: ${MYSQL_USER}
+            MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+        ports:
+            - '${MYSQL_PORT:-3306}:3306'
+        volumes:
+            - mariadb_data:/var/lib/mysql
+        networks:
+            - app-network
+
+    # phpMyAdmin
+    phpmyadmin:
+        image: phpmyadmin/phpmyadmin
+        container_name: peer-evaluation-phpmyadmin
+        environment:
+            PMA_HOST: db
+            PMA_PORT: 3306
+            PMA_USER: ${MYSQL_USER}
+            PMA_PASSWORD: ${MYSQL_PASSWORD}
+            UPLOAD_LIMIT: 300M
+        ports:
+            - '${PHPMYADMIN_PORT:-8080}:80'
+        depends_on:
+            - db
+        networks:
+            - app-network
+
+networks:
+    app-network:
+        driver: bridge
+
+volumes:
+    mariadb_data:
+        driver: local
