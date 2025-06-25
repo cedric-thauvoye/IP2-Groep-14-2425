@@ -1,6 +1,7 @@
 {
-  "name": "ip2-groep-14-2425",
-  "version": "0.0.0",
+  "name": "peer-evaluation-demo",
+  "version": "1.0.0",
+  "description": "Demo version of the Peer Evaluation System",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,16 +12,13 @@
     "format": "prettier --write src/"
   },
   "dependencies": {
-    "@azure/msal-browser": "^4.9.1",
     "@fortawesome/fontawesome-free": "^6.7.2",
     "@fortawesome/free-brands-svg-icons": "^6.7.2",
     "@fortawesome/free-regular-svg-icons": "^6.7.2",
     "@fortawesome/free-solid-svg-icons": "^6.7.2",
     "@fortawesome/vue-fontawesome": "^3.0.8",
-    "axios": "^1.7.9",
     "vue": "^3.5.13",
-    "vue-router": "^4.5.0",
-    "xlsx": "^0.18.5"
+    "vue-router": "^4.5.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",

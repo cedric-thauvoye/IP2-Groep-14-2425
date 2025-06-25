@@ -137,7 +137,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
-import { assessmentService } from '../services/api';
+import { assessmentService } from '../services/mockApi';
 import { useBackNavigation } from '../composables/useBackNavigation';
 
 const router = useRouter();

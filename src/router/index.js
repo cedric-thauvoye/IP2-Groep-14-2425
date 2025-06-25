@@ -1,13 +1,13 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { authService } from '../services/api'
+import { authService } from '../services/mockApi'  // Using mock API instead
 
 // View imports
-import LoginView from '../views/LoginView.vue'
+import LoginView from '../views/DemoLoginView.vue'  // Using demo login
 import HomeView from '../views/HomeView.vue'
 import CoursesView from '../views/CoursesView.vue'
 import GroupsView from '../views/GroupsView.vue'
 import StudentsView from '../views/StudentsView.vue'
-import ImportView from '../views/ImportView.vue'
+// ImportView removed for demo - import functionality not needed
 import AssessmentsView from '../views/AssessmentsView.vue'
 import ResultsView from '../views/ResultsView.vue'
 import AssessmentDetailView from '../views/AssessmentDetailView.vue'
@@ -91,12 +91,7 @@ const router = createRouter({
       component: StudentsView,
       beforeEnter: requireAuth
     },
-    {
-      path: '/import',
-      name: 'import',
-      component: ImportView,
-      beforeEnter: requireAuth
-    },
+    // Import route removed for demo - import functionality not needed
     {
       path: '/assessments',
       name: 'assessments',

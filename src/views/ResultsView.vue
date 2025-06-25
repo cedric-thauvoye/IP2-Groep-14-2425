@@ -160,7 +160,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
-import { courseService, assessmentService, groupService } from '../services/api';
+import { courseService, assessmentService, groupService } from '../services/mockApi';
 
 const router = useRouter();
 const loading = ref(true);

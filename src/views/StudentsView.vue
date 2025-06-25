@@ -4,9 +4,9 @@
             <div class="header">
                 <h1>Students</h1>
                 <div class="actions" v-if="isAdmin">
-                    <router-link to="/import" class="action-button"> <i class="fas fa-file-import"></i> Import Students </router-link>
+                    <!-- Import Students removed for demo -->
                     <button class="action-button export-button" @click="exportStudents">
-                        <i class="fas fa-file-export"></i> Export XLSX
+                        <i class="fas fa-file-export"></i> Export XLSX (Demo)
                     </button>
                     <button class="action-button" @click="showAddStudentModal = true"><i class="fas fa-user-plus"></i> Add Student</button>
                 </div>
@@ -211,10 +211,10 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
-import { userService, authService, courseService } from '../services/api';
+import { userService, authService, courseService } from '../services/mockApi';
 import notificationStore from '../stores/notificationStore';
 import StudentDetailView from '@/views/StudentDetailView.vue';
-import * as XLSX from 'xlsx';
+// XLSX removed for demo - export functionality mocked
 
 const router = useRouter();
 const students = ref([]);
@@ -391,57 +391,20 @@ const clearFilters = () => {
     filterStudents();
 };
 
-// Export functionality
+// Export functionality - Demo version
 const exportStudents = () => {
     try {
-        // Prepare data for XLSX export
-        const exportData = filteredStudents.value.map(student => {
-            const courses = getStudentCourses(student.id);
-            const courseNames = courses.map(c => c.name).join('; ');
-
-            return {
-                'Full Name': `${student.first_name} ${student.last_name}`,
-                'First Name': student.first_name,
-                'Last Name': student.last_name,
-                'Email': student.email,
-                'Q-Number': student.q_number || '',
-                'Course Enrollments': courseNames,
-                'Total Courses': courses.length,
-                'Q-Number Valid': isValidQNumber(student.q_number) ? 'Yes' : 'No'
-            };
-        });
-
-        // Create workbook and worksheet
-        const workbook = XLSX.utils.book_new();
-        const worksheet = XLSX.utils.json_to_sheet(exportData);
-
-        // Auto-size columns
-        const columnWidths = [
-            { wch: 20 }, // Full Name
-            { wch: 15 }, // First Name
-            { wch: 15 }, // Last Name
-            { wch: 30 }, // Email
-            { wch: 12 }, // Q-Number
-            { wch: 40 }, // Course Enrollments
-            { wch: 12 }, // Total Courses
-            { wch: 15 }  // Q-Number Valid
-        ];
-        worksheet['!cols'] = columnWidths;
-
-        // Add worksheet to workbook
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Students');
-
-        // Generate filename with current date
+        // Mock export for demo - just show a notification
         const currentDate = new Date().toISOString().split('T')[0];
         const filename = `students_export_${currentDate}.xlsx`;
 
-        // Write and download file
-        XLSX.writeFile(workbook, filename);
+        // Simulate export success
+        notificationStore.success(`Demo: Would export ${filteredStudents.value.length} students to ${filename} (Export functionality disabled in demo)`);
 
-        notificationStore.success(`Exported ${filteredStudents.value.length} students to ${filename}`);
+        console.log('Demo: Export would include:', filteredStudents.value.map(s => `${s.first_name} ${s.last_name}`));
     } catch (error) {
-        console.error('Error exporting students:', error);
-        notificationStore.error('Failed to export students. Please try again.');
+        console.error('Error in demo export:', error);
+        notificationStore.error('Demo export failed. This is expected in demo mode.');
     }
 };
 

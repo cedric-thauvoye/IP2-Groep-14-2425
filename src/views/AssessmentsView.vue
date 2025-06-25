@@ -458,7 +458,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
-import { assessmentService, authService, courseService, groupService } from '../services/api';
+import { assessmentService, authService, courseService, groupService } from '../services/mockApi';
 
 const router = useRouter();
 const activeTab = ref('pending');

@@ -2,13 +2,9 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
 import './assets/main.css'
-import { config } from './config'
 
 // Create Vue app
 const app = createApp(App)
-
-// Make config available globally to components
-app.config.globalProperties.$config = config
 
 // Use router
 app.use(router)
@@ -32,7 +28,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-// Log config in development mode
-if (import.meta.env.DEV) {
-  console.log('App Config:', config)
-}
+// Demo mode indicator
+console.log('🎯 DEMO MODE: Peer Evaluation System')
+console.log('📚 Try logging in with: teacher/teacher123, student1/student123, or admin/admin123')

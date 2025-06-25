@@ -299,7 +299,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
-import { courseService, authService, userService } from '../services/api';
+import { courseService, authService, userService } from '../services/mockApi';
 
 const router = useRouter();
 const courses = ref([]);

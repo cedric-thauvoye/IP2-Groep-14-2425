@@ -1,6 +1,9 @@
 <template>
     <PageLayout>
         <div v-if="user" class="dashboard">
+            <!-- Demo Banner -->
+            <DemoBanner v-if="showDemoBanner" @dismiss="showDemoBanner = false" />
+
             <!-- Welcome Section -->
             <div class="welcome-section">
                 <h1>Welcome back, {{ user.firstName || user.first_name }} {{ user.lastName || user.last_name }}!</h1>
@@ -107,11 +110,13 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
-import { authService, courseService, groupService, assessmentService, userService } from '../services/api';
+import DemoBanner from '../components/Common/DemoBanner.vue';
+import { authService, courseService, groupService, assessmentService, userService } from '../services/mockApi';
 
 const router = useRouter();
 const user = ref(null);
 const isTeacher = ref(false);
+const showDemoBanner = ref(true);
 const courses = ref([]);
 const groups = ref([]);
 const pendingAssessments = ref([]);

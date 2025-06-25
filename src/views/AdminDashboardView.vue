@@ -620,7 +620,7 @@
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
-import { courseService, groupService, authService, userService, assessmentService } from '../services/api';
+import { courseService, groupService, authService, userService, assessmentService } from '../services/mockApi';
 import { useNotificationStore } from '../stores/notificationStore';
 
 const router = useRouter();

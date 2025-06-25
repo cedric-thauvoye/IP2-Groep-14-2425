@@ -15,7 +15,7 @@
 
 <script setup>
 import { ref } from 'vue';
-import { authService } from '../../services/api';
+import { authService } from '../../services/mockApi';
 import notificationStore from '../../stores/notificationStore';
 
 const roleInfo = ref(null);

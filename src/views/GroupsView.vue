@@ -7,9 +7,7 @@
           <button class="action-button" @click="showCreateGroupModal = true">
             <i class="fas fa-plus"></i> Create Group
           </button>
-          <router-link to="/import" class="action-button import">
-            <i class="fas fa-file-import"></i> Import Groups
-          </router-link>
+          <!-- Import Groups removed for demo -->
         </div>
       </div>
 
@@ -238,7 +236,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
-import { groupService, authService, courseService, userService } from '../services/api';
+import { groupService, authService, courseService, userService } from '../services/mockApi';
 
 const router = useRouter();
 const groups = ref([]);

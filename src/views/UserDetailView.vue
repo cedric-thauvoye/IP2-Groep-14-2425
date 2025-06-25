@@ -387,7 +387,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
-import { userService, authService, courseService } from '../services/api';
+import { userService, authService, courseService } from '../services/mockApi';
 import { useBackNavigation } from '../composables/useBackNavigation';
 import notificationStore from '../stores/notificationStore';
 

@@ -38,7 +38,7 @@
 
 <script setup>
 import { ref } from 'vue';
-import { userService } from '../services/api';
+import { userService } from '../services/mockApi';
 
 const emit = defineEmits(['close', 'created']);
 

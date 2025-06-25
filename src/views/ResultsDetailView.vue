@@ -260,7 +260,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
-import { assessmentService, authService } from '../services/api';
+import { assessmentService, authService } from '../services/mockApi';
 import { useBackNavigation } from '../composables/useBackNavigation';
 
 const route = useRoute();

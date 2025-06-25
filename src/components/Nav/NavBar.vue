@@ -54,9 +54,7 @@
                     <NavOption to="/students" @click="handleNavOptionClick">
                         <i class="fas fa-user-graduate"></i> Students
                     </NavOption>
-                    <NavOption to="/import" @click="handleNavOptionClick">
-                        <i class="fas fa-file-import"></i> Import Data
-                    </NavOption>
+                    <!-- Import Data removed for demo -->
                 </div>
 
                 <!-- Admin Section -->
@@ -91,8 +89,7 @@
 import { ref, onMounted, onBeforeUnmount, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import NavOption from './NavOption.vue';
-import { authService } from '../../services/api';
-import { logout } from '../../services/msalService';
+import { authService } from '../../services/mockApi';
 
 const user = ref(null);
 const isNavBarVisible = ref(false);
@@ -240,8 +237,12 @@ const signOutUser = async () => {
     try {
         console.log("User initiated logout...");
 
-        await logout();
+        // Simple demo logout
+        await authService.logout();
         user.value = null;
+
+        // Redirect to login
+        router.push('/');
 
     } catch (error) {
         console.error("Sign out error:", error);
@@ -252,7 +253,7 @@ const signOutUser = async () => {
         user.value = null;
 
         // Force navigation to login
-        window.location.href = '/?logout=true';
+        router.push('/');
     }
 };
 

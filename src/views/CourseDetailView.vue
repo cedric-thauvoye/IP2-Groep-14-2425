@@ -519,7 +519,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import PageLayout from '../components/Layout/PageLayout.vue';
 import AddStudentModal from '../components/Common/AddStudentModal.vue';
-import { courseService, authService, userService, groupService } from '../services/api';
+import { courseService, authService, userService, groupService } from '../services/mockApi';
 import { useNotificationStore } from '../stores/notificationStore';
 import { useBackNavigation } from '../composables/useBackNavigation';
 
